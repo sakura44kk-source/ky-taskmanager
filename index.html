@@ -396,10 +396,10 @@ function renderMx(sec){
           const sel=bulkSel[sec]&&bulkSel[sec][t.id];
           return `
           <div class="ti">
-            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}')">
+            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}','${esc(t.text)}')">
               ${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'<span style="color:white;font-size:12px;font-weight:900;line-height:1;">✓</span>':''}
             </div>
-            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}')" oncontextmenu="editTask(event,'${t.id}','${sec}');return false;" ontouchstart="startLongPress('${t.id}','${sec}')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">${esc(t.text)}</span>
+            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}','${esc(t.text)}')" oncontextmenu="editTask(event,'${t.id}','${sec}');return false;" ontouchstart="startLongPress('${t.id}','${sec}')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">${esc(t.text)}</span>
             <span class="xb" onclick="delTask('${t.id}')">×</span>
           </div>`;
         }).join('')}
@@ -525,10 +525,11 @@ async function addTask(sec,q){
       .then(()=>loadAll(true)).catch(e=>toast('同期エラー: '+e.message,1));
   }
 }
-function toggleBulk(id,sec,q){
+function toggleBulk(id,sec,q,txt){
   if(!bulkSel[sec]) bulkSel[sec]={};
-  if(bulkSel[sec][String(id)]) delete bulkSel[sec][String(id)];
-  else bulkSel[sec][String(id)]=q;
+  const key=String(id);
+  if(bulkSel[sec][key]) delete bulkSel[sec][key];
+  else bulkSel[sec][key]={q,txt};
   renderMx(sec);
 }
 async function bulkDone(sec){
