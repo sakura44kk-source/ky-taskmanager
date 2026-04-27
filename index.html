@@ -533,6 +533,10 @@ function toggleBulk(id,sec,q){
 async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
   if(!checked.length){ toast('選択なし',1); return; }
+  // IDデバッグ
+  const firstCid=checked[0];
+  const firstTask=S.tasks.find(x=>x.section===sec&&x.status==='active');
+  alert('bulkSelID: ['+typeof firstCid+'] '+firstCid+'\nS.tasks ID: ['+typeof firstTask?.id+'] '+firstTask?.id+'\n一致: '+(String(firstTask?.id)===String(firstCid)));
   const now=new Date().toISOString();
   const doneIds=new Set();
   let foundCount=0;
