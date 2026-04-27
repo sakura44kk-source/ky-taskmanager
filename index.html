@@ -396,10 +396,10 @@ function renderMx(sec){
           const sel=bulkSel[sec]&&bulkSel[sec][t.id];
           return `
           <div class="ti">
-            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}','${esc(t.text)}')">
+            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}')">
               ${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'<span style="color:white;font-size:12px;font-weight:900;line-height:1;">✓</span>':''}
             </div>
-            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}','${esc(t.text)}')" oncontextmenu="editTask(event,'${t.id}','${sec}');return false;" ontouchstart="startLongPress('${t.id}','${sec}')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">${esc(t.text)}</span>
+            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}')" oncontextmenu="editTask(event,'${t.id}','${sec}');return false;" ontouchstart="startLongPress('${t.id}','${sec}')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">${esc(t.text)}</span>
             <span class="xb" onclick="delTask('${t.id}')">×</span>
           </div>`;
         }).join('')}
@@ -525,20 +525,22 @@ async function addTask(sec,q){
       .then(()=>loadAll(true)).catch(e=>toast('同期エラー: '+e.message,1));
   }
 }
-function toggleBulk(id,sec,q,txt){
+function toggleBulk(id,sec,q){
   if(!bulkSel[sec]) bulkSel[sec]={};
   const key=String(id);
-  if(bulkSel[sec][key]) delete bulkSel[sec][key];
-  else bulkSel[sec][key]={q,txt};
+  if(bulkSel[sec][key]){
+    delete bulkSel[sec][key];
+  } else {
+    // S.tasksからテキストを直接取得
+    const t=S.tasks.find(x=>String(x.id)===key||x._tmpId===key);
+    bulkSel[sec][key]={q, txt: t?t.text:''};
+  }
   renderMx(sec);
 }
 async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
   if(!checked.length){ toast('選択なし',1); return; }
   // IDデバッグ
-  const firstCid=checked[0];
-  const firstTask=S.tasks.find(x=>x.section===sec&&x.status==='active');
-  alert('bulkSelID: ['+typeof firstCid+'] '+firstCid+'\nS.tasks ID: ['+typeof firstTask?.id+'] '+firstTask?.id+'\n一致: '+(String(firstTask?.id)===String(firstCid)));
   const now=new Date().toISOString();
   const doneIds=new Set();
   let foundCount=0;
