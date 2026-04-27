@@ -14,12 +14,12 @@
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 html, body { overflow-x: hidden; max-width: 100%; width: 100%; }
 :root {
-  --bg:#f2f3f7; --card:#ffffff; --border:#e8eaed; --text:#1a1a2e; --sub:#999;
-  --k:#ff6b6b; --y:#7c5cbf; --req:#20b2aa; --ship:#f9a825;
-  --q1:#ff6b6b; --q1bg:#fff6f6; --q1bd:#ffcdd2;
-  --q2:#4dabf7; --q2bg:#f0f7ff; --q2bd:#bbdefb;
-  --q3:#ffb347; --q3bg:#fffbf0; --q3bd:#ffe0a0;
-  --q4:#f9a825; --q4bg:#fff8e1; --q4bd:#ffe082;
+  --bg:#f5f6f8; --card:#ffffff; --border:#e5e7eb; --text:#1f2937; --sub:#9ca3af;
+  --k:#ef4444; --y:#7c3aed; --req:#0891b2; --ship:#d97706;
+  --q1:#ef4444; --q1bg:#fef2f2; --q1bd:#fecaca;
+  --q2:#2563eb; --q2bg:#eff6ff; --q2bd:#bfdbfe;
+  --q3:#d97706; --q3bg:#fffbeb; --q3bd:#fde68a;
+  --q4:#059669; --q4bg:#ecfdf5; --q4bd:#a7f3d0;
 }
 body { background:var(--bg); font-family:'Noto Sans JP','Hiragino Sans',sans-serif; min-height:100vh; overflow-x:hidden; }
 
@@ -46,24 +46,24 @@ body { background:var(--bg); font-family:'Noto Sans JP','Hiragino Sans',sans-ser
 .tabs::-webkit-scrollbar { display:none; }
 .tab { flex-shrink:0; padding:7px 10px; border-radius:10px 10px 0 0; font-size:11px; font-weight:700; cursor:pointer; background:transparent; border:none; color:var(--sub); font-family:inherit; letter-spacing:0; }
 .tab.act { background:var(--card); color:var(--text); }
-.content { padding:8px 8px 80px; overflow-x:hidden; }
+.content { padding:8px 12px 80px; overflow-x:hidden; }
 .page { overflow-x:hidden; width:100%; }
 .hdr-top { overflow:hidden; }
 .page { display:none; } .page.act { display:block; }
 
 /* EISENHOWER */
-.ax-row { display:grid; grid-template-columns:calc(50vw - 13px) calc(50vw - 13px); gap:6px; margin-bottom:5px; }
+.ax-row { display:none; }
 .ax-col { text-align:center; font-size:10px; font-weight:700; }
 .gw { display:block; width:100%; overflow:hidden; }
 .ax-side { display:none; }
 .ax-lbl { display:none; }
-.grid { display:grid; grid-template-columns:calc(50vw - 13px) calc(50vw - 13px); gap:6px; }
-.qc { border-radius:14px; padding:10px 10px 8px; min-height:140px; display:flex; flex-direction:column; min-width:0; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.grid { display:flex; flex-direction:column; gap:8px; width:100%; }
+.qc { border-radius:14px; padding:12px 14px 10px; display:flex; flex-direction:column; min-width:0; box-shadow:0 1px 4px rgba(0,0,0,0.06); width:100%; }
 .qc-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-.qc-lbl { font-size:11px; font-weight:900; letter-spacing:0.02em; }
+.qc-lbl { font-size:12px; font-weight:900; letter-spacing:0.01em; }
 .qc-cnt { font-size:10px; color:#bbb; }
-.ti { display:flex; align-items:center; gap:8px; padding:7px 2px; border-bottom:1px solid rgba(0,0,0,.04); min-height:36px; border-radius:6px; transition:background .1s; }
-.chk { width:26px; height:26px; border-radius:13px; border:2px solid #ddd; background:white; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s; -webkit-tap-highlight-color:transparent; }
+.ti { display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px solid rgba(0,0,0,.04); min-height:32px; border-radius:6px; }
+.chk { width:20px; height:20px; border-radius:10px; border:2px solid #ddd; background:white; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s; -webkit-tap-highlight-color:transparent; }
 .tt { font-size:13px; color:#2d2d2d; flex:1; line-height:1.5; cursor:pointer; font-weight:500; word-break:break-all; min-width:0; }
 .xb { color:#ddd; font-size:18px; cursor:pointer; flex-shrink:0; padding:2px 4px; }
 .xb:hover { color:#f88; }
@@ -281,7 +281,7 @@ const QM={
   q1:{l:'今すぐやる',c:'var(--q1)',bg:'var(--q1bg)',bd:'var(--q1bd)'},
   q2:{l:'計画する',  c:'var(--q2)',bg:'var(--q2bg)',bd:'var(--q2bd)'},
   q3:{l:'任せる',    c:'var(--q3)',bg:'var(--q3bg)',bd:'var(--q3bd)'},
-  q4:{l:'📦 発送中',  c:'#f9a825',bg:'var(--q4bg)',bd:'var(--q4bd)'},
+  q4:{l:'📦 発送中',  c:'#059669',bg:'var(--q4bg)',bd:'var(--q4bd)'},
 };
 const CW_ROOM_ORDER='423443544';
 const CW_ROOM_SHIIRE='423443517';
