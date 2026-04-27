@@ -422,6 +422,25 @@ function renderMx(sec){
       </div>`;
   });
 
+  // 固定完了ボタン
+  const bulkCnt=Object.keys(bulkSel[sec]||{}).length;
+  let fb=document.getElementById('fb-'+sec);
+  if(!fb){
+    fb=document.createElement('button');
+    fb.id='fb-'+sec;
+    fb.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:300;border:none;border-radius:28px;padding:14px 32px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,0.25);display:none;';
+    fb.style.background=sec==='K'?'var(--k)':'var(--y)';
+    fb.style.color='white';
+    fb.onclick=()=>bulkDone(sec);
+    document.body.appendChild(fb);
+  }
+  if(bulkCnt>0){
+    fb.textContent='✓ '+bulkCnt+'件を完了';
+    fb.style.display='block';
+  } else {
+    fb.style.display='none';
+  }
+
   const isOpen=DNopen[sec];
   dnEl.innerHTML=dn.length===0?'': `
     <div class="done-sec">
