@@ -805,7 +805,7 @@ function renderArchive() {
   items.sort((a,b) => {
     const da = a.data._doneAt || a.data.done_at || '';
     const db = b.data._doneAt || b.data.done_at || '';
-    return da.localeCompare(db);
+    return db.localeCompare(da);
   });
 
   if (!items.length) {
