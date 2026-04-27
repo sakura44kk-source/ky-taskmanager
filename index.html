@@ -275,46 +275,48 @@ body { background:var(--bg); font-family:'Noto Sans JP','Hiragino Sans',sans-ser
 <div class="toast" id="toast"></div>
 
 <script>
-const bulkSel = {K:{},Y:{}};
-let CW_TOKEN='';
-const CW_ROOM_ORDER='423443544';
-const CW_ROOM_SHIIRE='423443517';
-const STEPS = ['Thanksメッセージ','商品確保','梱包','出荷手続き','出荷','完了メッセージ'];
-const QM = {
+// ── 定数 ──
+const STEPS=['Thanksメッセージ','商品確保','梱包','出荷手続き','出荷','完了メッセージ'];
+const QM={
   q1:{l:'今すぐやる',c:'var(--q1)',bg:'var(--q1bg)',bd:'var(--q1bd)'},
   q2:{l:'計画する',  c:'var(--q2)',bg:'var(--q2bg)',bd:'var(--q2bd)'},
   q3:{l:'任せる',    c:'var(--q3)',bg:'var(--q3bg)',bd:'var(--q3bd)'},
   q4:{l:'やめる',    c:'var(--q4)',bg:'var(--q4bg)',bd:'var(--q4bd)'},
 };
+const CW_ROOM_ORDER='423443544';
+const CW_ROOM_SHIIRE='423443517';
 
-
-let orderWho = '';
-function setOrderWho(v) {
-  orderWho = v;
-  ['k','y','b'].forEach(x => document.getElementById('owho-'+x).classList.remove('sel'));
-  const map = {K:'k',Y:'y',KY:'b'};
-  if(map[v]) document.getElementById('owho-'+map[v]).classList.add('sel');
-}
-
+// ── 状態 ──
 let API='', ME='', S={tasks:[],reqs:[],orders:[]}, DNopen={K:false,Y:false};
+let CW_TOKEN='';
+let orderWho='';
+let editTaskId='', editSec='', lpTimer=null;
+let sReqOrderId='', sReqItemName='', sReqStep='', sReqWho='';
+let arcMode='all';
+let bulkTexts={K:new Set(), Y:new Set()}; // テキストベースで選択管理
 
-// ── INIT ──
+// ── 初期化 ──
 window.onload=()=>{
   API=localStorage.getItem('ky_api')||'';
-  ME =localStorage.getItem('ky_me') ||'';
+  ME=localStorage.getItem('ky_me')||'';
   CW_TOKEN=localStorage.getItem('ky_cw_token')||'';
   if(API&&ME) boot();
 };
 
-function selUser(u){ ME=u; document.getElementById('btn-k').className='ubtn k'+(u==='K'?' sel':''); document.getElementById('btn-y').className='ubtn y'+(u==='Y'?' sel':''); }
+function selUser(u){
+  ME=u;
+  document.getElementById('btn-k').className='ubtn k'+(u==='K'?' sel':'');
+  document.getElementById('btn-y').className='ubtn y'+(u==='Y'?' sel':'');
+}
 
 function saveSetup(){
   const url=document.getElementById('url-in').value.trim();
   if(!url){alert('URLを入力してください');return;}
   if(!ME){alert('KかYを選んでください');return;}
-  const cwToken=document.getElementById('cw-token-in').value.trim();
-  localStorage.setItem('ky_api',url); localStorage.setItem('ky_me',ME);
-  if(cwToken) localStorage.setItem('ky_cw_token',cwToken);
+  const cwt=document.getElementById('cw-token-in').value.trim();
+  localStorage.setItem('ky_api',url);
+  localStorage.setItem('ky_me',ME);
+  if(cwt) localStorage.setItem('ky_cw_token',cwt);
   API=url; boot();
 }
 
@@ -325,7 +327,6 @@ function boot(){
   b.textContent=ME==='K'?'🙋 K':'👤 Y';
   b.style.background=ME==='K'?'var(--k)':'var(--y)';
   loadAll();
-  // 60秒ごとにバックグラウンド自動更新
   setInterval(()=>loadAll(true), 60000);
 }
 
@@ -334,40 +335,46 @@ function switchUser(){
 }
 
 // ── API ──
-async function get(action){ const r=await fetch(`${API}?action=${action}`,{redirect:'follow'}); const j=await r.json(); if(!j.ok) throw new Error(j.error); return j.data; }
+async function get(action){
+  const r=await fetch(`${API}?action=${action}`,{redirect:'follow'});
+  const j=await r.json();
+  if(!j.ok) throw new Error(j.error);
+  return j.data;
+}
 async function post(body){
-  // Content-Typeを指定しない → text/plainとして送信 → CORSプリフライト回避
   const r=await fetch(API,{method:'POST',body:JSON.stringify(body),redirect:'follow'});
-  const text=await r.text();
-  const j=JSON.parse(text);
+  const j=JSON.parse(await r.text());
   if(!j.ok) throw new Error(j.error);
   return j;
 }
+function syncBg(body){ post(body).catch(e=>console.error('sync:',e)); }
 
+// ── データ取得 ──
 async function loadAll(silent=false){
   try{
     const [tasks,reqs,orders]=await Promise.all([get('getTasks'),get('getRequests'),get('getOrders')]);
-    S={tasks,reqs,orders}; renderAll();
+    S={tasks,reqs,orders};
+    renderAll();
     if(!silent) toast('更新しました');
   }catch(e){ toast('エラー: '+e.message,1); }
 }
 
-// バックグラウンドでGASに保存（画面はすでに更新済み）
-function syncBg(body){ post(body).catch(e=>toast('同期エラー: '+e.message,1)); }
+// ── レンダリング ──
+function renderAll(){
+  renderMx('K'); renderMx('Y'); renderOrders(); renderArchive(); updateBulkBar();
+}
 
-// ── RENDER ──
-function renderAll(){ renderMx('K'); renderMx('Y'); renderOrders(); renderArchive(); updateBulkBar(); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderMx(sec){
-  const other = sec==='K'?'Y':'K';
+  const other=sec==='K'?'Y':'K';
   const act=S.tasks.filter(t=>t.section===sec&&t.status==='active');
-  const dn =S.tasks.filter(t=>t.section===sec&&t.status==='done');
-  // 依頼: もらった(→q1) / 出した(→q3)
-  const reqIn  = S.reqs.filter(r=>r.to_user===sec  &&r.status==='pending');
-  const reqOut = S.reqs.filter(r=>r.from_user===sec&&r.status==='pending');
-  const lc=sec.toLowerCase();
-  const mxEl=document.getElementById(lc+'-mx');
-  const dnEl=document.getElementById(lc+'-dn');
+  const dn=S.tasks.filter(t=>t.section===sec&&t.status==='done');
+  const reqIn=S.reqs.filter(r=>r.to_user===sec&&r.status==='pending');
+  const reqOut=S.reqs.filter(r=>r.from_user===sec&&r.status==='pending');
+  const mxEl=document.getElementById(sec.toLowerCase()+'-mx');
+  const dnEl=document.getElementById(sec.toLowerCase()+'-dn');
+  if(!mxEl||!dnEl) return;
 
   mxEl.innerHTML=`
     <div class="ax-row">
@@ -375,10 +382,7 @@ function renderMx(sec){
       <div class="ax-col" style="color:var(--q2)">📅 計画</div>
     </div>
     <div class="gw">
-      <div class="ax-side">
-        <div class="ax-lbl" style="color:${sec==='K'?'var(--k)':'var(--y)'}">${sec==='K'?'🙋':'👤'} ${sec}</div>
-        <div class="ax-lbl" style="color:${sec==='K'?'var(--y)':'var(--k)'}">${sec==='K'?'👤':'🙋'} ${other}</div>
-      </div>
+      <div class="ax-side"></div>
       <div class="grid" id="${sec}-g"></div>
     </div>`;
 
@@ -386,37 +390,37 @@ function renderMx(sec){
   ['q1','q2','q3','q4'].forEach(q=>{
     const qt=act.filter(t=>t.quadrant===q);
     const m=QM[q];
-    // q1: 受けた依頼を追加, q3: 出した依頼を追加
-    const extraReqs = q==='q1' ? reqIn : q==='q3' ? reqOut : [];
-    const totalCnt = qt.length + extraReqs.length;
+    const extras=q==='q1'?reqIn:q==='q3'?reqOut:[];
+    const cnt=qt.length+extras.length;
     g.innerHTML+=`
       <div class="qc" style="background:${m.bg};border:1.5px solid ${m.bd}">
         <div class="qc-hdr">
           <span class="qc-lbl" style="color:${m.c}">${m.l}</span>
-          <div style="display:flex;gap:4px;align-items:center">
-            ${totalCnt?`<span class="qc-cnt">${totalCnt}件</span>`:''}
-          </div>
+          ${cnt?`<span class="qc-cnt">${cnt}件</span>`:''}
         </div>
         ${qt.map(t=>{
-          const sel=bulkSel[sec]&&bulkSel[sec][t.id];
-          return `
-          <div class="ti">
-            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}')">
-              ${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'<span style="color:white;font-size:12px;font-weight:900;line-height:1;">✓</span>':''}
+          const sel=bulkTexts[sec].has(t.text);
+          return `<div class="ti">
+            <div class="chk" style="border-color:${m.bd};${sel?'background:'+m.c+';border-color:'+m.c+';':''}"
+              onclick="toggleBulk(${JSON.stringify(t.text)},'${sec}')">
+              ${sel?'<span style="color:white;font-size:12px;font-weight:900;">✓</span>':''}
             </div>
-            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}')" oncontextmenu="editTask(event,'${t.id}','${sec}');return false;" ontouchstart="startLongPress('${t.id}','${sec}')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">${esc(t.text)}</span>
+            <span class="tt"
+              onclick="toggleBulk(${JSON.stringify(t.text)},'${sec}')"
+              ontouchstart="startLongPress(${JSON.stringify(String(t.id))},'${sec}')"
+              ontouchend="clearLongPress()"
+              ontouchmove="clearLongPress()">${esc(t.text)}</span>
             <span class="xb" onclick="delTask('${t.id}')">×</span>
           </div>`;
         }).join('')}
-        ${extraReqs.map(r=>{
-          const fromC = r.from_user==='K'?'var(--k)':'var(--y)';
-          const label = q==='q1'
-            ? `<span style="font-size:9px;font-weight:600;color:${fromC};margin-right:3px;">🔁${r.from_user}→</span>`
-            : `<span style="font-size:9px;font-weight:600;color:var(--req);margin-right:3px;">🔁→${r.to_user}</span>`;
-          return `
-          <div class="ti" style="opacity:0.85;">
-            <div class="chk" style="border-color:var(--req);background:transparent;" onclick="doneReq('${r.id}')"></div>
-            <span class="tt" style="color:#555;">${label}${esc(r.text)}</span>
+        ${extras.map(r=>{
+          const fc=r.from_user==='K'?'var(--k)':'var(--y)';
+          const lbl=q==='q1'
+            ?`<span style="font-size:9px;color:${fc};">🔁${r.from_user}→</span>`
+            :`<span style="font-size:9px;color:var(--req);">🔁→${r.to_user}</span>`;
+          return `<div class="ti" style="opacity:0.85;">
+            <div class="chk" style="border-color:var(--req);" onclick="doneReq('${r.id}')"></div>
+            <span class="tt" style="color:#555;">${lbl} ${esc(r.text)}</span>
           </div>`;
         }).join('')}
         <div class="ar">
@@ -427,12 +431,13 @@ function renderMx(sec){
       </div>`;
   });
 
+  // 完了セクション
   const isOpen=DNopen[sec];
-  dnEl.innerHTML=dn.length===0?'': `
+  dnEl.innerHTML=dn.length===0?'':`
     <div class="done-sec">
       <div class="done-hdr" onclick="toggleDn('${sec}')">
         <span class="done-t">✅ 完了 (${dn.length}件)</span>
-        <span class="done-cv ${isOpen?'op':''}" id="dcv-${sec}">▼</span>
+        <span class="done-cv ${isOpen?'op':''}">▼</span>
       </div>
       ${isOpen?`<div class="done-bd">${dn.map(t=>`
         <div class="done-i">
@@ -444,88 +449,9 @@ function renderMx(sec){
     </div>`;
 }
 
-function renderReqs(){
-  const kty=S.reqs.filter(r=>r.from_user==='K'&&r.to_user==='Y'&&r.status!=='done');
-  const ytk=S.reqs.filter(r=>r.from_user==='Y'&&r.to_user==='K'&&r.status!=='done');
-  document.getElementById('kty-n').textContent=kty.length?kty.length+'件':'';
-  document.getElementById('ytk-n').textContent=ytk.length?ytk.length+'件':'';
-  const ri=r=>`<div class="ri"><span class="rt">${esc(r.text)}</span><div class="rchk" onclick="doneReq('${r.id}')">✓</div><span class="xb" onclick="delReq('${r.id}')">×</span></div>`;
-  document.getElementById('kty-list').innerHTML=kty.length?kty.map(ri).join(''):`<div class="empty">なし</div>`;
-  document.getElementById('ytk-list').innerHTML=ytk.length?ytk.map(ri).join(''):`<div class="empty">なし</div>`;
-}
-
-function renderOrders(){
-  const el=document.getElementById('orders');
-  const active=S.orders.filter(o=>parseInt(o.step)<6).reverse();
-  if(!active.length){ el.innerHTML=`<div style="text-align:center;padding:30px;color:#ccc;font-size:13px">受注なし</div>`; return; }
-  el.innerHTML=active.map(o=>{
-    const step=parseInt(o.step)||1;
-    return `<div class="oc">
-      <div class="oc-hdr">
-        <div>
-          <div class="oc-id">${esc(o.order_id)}${o.amount_usd?' · $'+o.amount_usd:''}</div>
-          <div class="oc-name">${esc(o.item_name)}</div>
-          <div class="oc-buyer">👤 ${esc(o.buyer)}</div>
-          ${o.assignee||o.source ? `<div style="font-size:10px;color:var(--sub);margin-top:2px;display:flex;gap:8px;">` + (o.assignee?`<span>🙋 ${esc(o.assignee)}</span>`:'') + (o.source?`<span>🏪 ${esc(o.source)}</span>`:'') + `</div>` : ''}
-        </div>
-        <span class="oc-del" onclick="delOrder('${o.order_id}')">×</span>
-      </div>
-      <div class="steps">
-        ${STEPS.map((s,i)=>{
-          const sn=i+1;
-          const cls=sn<step?'done':sn===step?'cur':'';
-          return `${i?'<span class="sarr">›</span>':''}<div class="step ${cls}" onclick="updStep('${o.order_id}',${sn})">${s}</div>`;
-        }).join('')}
-      </div>
-      <div style="margin-top:8px;text-align:right;">
-        <button onclick="openSReq('${o.order_id}','${esc(o.item_name)}')" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid var(--req);background:transparent;color:var(--req);cursor:pointer;font-family:inherit;">🔁 ステップを依頼</button>
-      </div>
-      ${o.notes?`<div style="font-size:11px;color:#999;margin-top:6px">📝 ${esc(o.notes)}</div>`:''}
-    </div>`;
-  }).join('');
-}
-
-// ── ACTIONS ──
-async function addTask(sec,q){
-  const inp=document.getElementById(`i-${sec}-${q}`);
-  const txt=inp.value.trim(); if(!txt)return; inp.value='';
-  const other=sec==='K'?'Y':'K';
-  const now=new Date().toISOString();
-  const id1='tmp_'+Date.now();
-  // ローカル即時追加
-  S.tasks.push({id:id1,section:sec,text:txt,quadrant:q,status:'active',created_at:now});
-  if(q==='q3'){
-    const id2='tmp_'+(Date.now()+1);
-    S.tasks.push({id:id2,section:other,text:txt,quadrant:'q1',status:'active',created_at:now});
-  }
-  renderAll();
-  // バックグラウンド同期してIDを正式なものに更新
-  if(q==='q3'){
-    Promise.all([
-      post({action:'addTask',section:sec,text:txt,quadrant:'q3'}),
-      post({action:'addTask',section:other,text:txt,quadrant:'q1'})
-    ]).then(()=>loadAll(true)).catch(e=>toast('同期エラー: '+e.message,1));
-  } else {
-    post({action:'addTask',section:sec,text:txt,quadrant:q})
-      .then(()=>loadAll(true)).catch(e=>toast('同期エラー: '+e.message,1));
-  }
-}
-function toggleBulk(id,sec,q){
-  if(!bulkSel[sec]) bulkSel[sec]={};
-  const key=String(id);
-  if(bulkSel[sec][key]){
-    delete bulkSel[sec][key];
-  } else {
-    // S.tasksからテキストを直接取得
-    const t=S.tasks.find(x=>String(x.id)===key||x._tmpId===key);
-    bulkSel[sec][key]={q, txt: t?t.text:''};
-  }
-  renderMx(sec);
-}
+// ── まとめて完了バー ──
 function updateBulkBar(){
-  const kCnt=Object.keys(bulkSel['K']||{}).length;
-  const yCnt=Object.keys(bulkSel['Y']||{}).length;
-  const total=kCnt+yCnt;
+  const total=bulkTexts.K.size+bulkTexts.Y.size;
   const bar=document.getElementById('bulk-bar');
   const btn=document.getElementById('bulk-btn');
   if(!bar||!btn) return;
@@ -536,377 +462,354 @@ function updateBulkBar(){
     bar.style.display='none';
   }
 }
+
+function toggleBulk(text, sec){
+  if(bulkTexts[sec].has(text)) bulkTexts[sec].delete(text);
+  else bulkTexts[sec].add(text);
+  renderMx(sec);
+  updateBulkBar();
+}
+
 function bulkDoneActive(){
-  const sec=Object.keys(bulkSel['K']||{}).length>0?'K':'Y';
-  bulkDone(sec);
-}
-async function bulkDone(sec){
-  const checked=Object.keys(bulkSel[sec]||{});
-  if(!checked.length){ toast('選択なし',1); return; }
-  // IDデバッグ
   const now=new Date().toISOString();
-  const doneIds=new Set();
-  let foundCount=0;
-  checked.forEach(cid=>{
-    S.tasks.forEach(x=>{
-      if(String(x.id)===String(cid)){
-        foundCount++;
-        S.tasks.forEach(y=>{
-          if(y.text.trim()===x.text.trim()&&y.status==='active'){
-            y.status='done'; y._doneAt=now;
-            doneIds.add(String(y.id));
-          }
-        });
-      }
-    });
-  });
-  // 1つのトーストに全情報
-  if(doneIds.size>0){ toast(doneIds.size+'件完了！'); } else { toast('タスクが見つかりません',1); }
-  DNopen[sec]=true; bulkSel[sec]={};
-  renderAll();
-  doneIds.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>console.error(e)));
-}
-async function doneTask(id,sec){
-  const now=new Date().toISOString();
-  const doneIds=new Set();
-  // 押したタスクのテキストを取得
-  const base=S.tasks.find(x=>String(x.id)===String(id));
-  if(!base) return;
-  // 同テキストのK・Y両方を完了
+  const allTexts=new Set([...bulkTexts.K,...bulkTexts.Y]);
+  if(!allTexts.size){ toast('選択なし',1); return; }
   S.tasks.forEach(x=>{
-    if(x.text.trim()===base.text.trim()&&x.status==='active'){
+    if(x.status==='active'&&allTexts.has(x.text)){
       x.status='done'; x._doneAt=now;
-      doneIds.add(String(x.id));
+      syncBg({action:'updateTask',id:x.id,status:'done'});
     }
   });
-  DNopen[sec]=true; renderAll();
-  doneIds.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>console.error(e)));
+  bulkTexts={K:new Set(),Y:new Set()};
+  DNopen.K=true; DNopen.Y=true;
+  renderAll();
+  toast(allTexts.size+'件を完了しました！');
 }
-async function restoreTask(id){
-  const t=S.tasks.find(t=>t.id===id); if(t) t.status='active';
+
+// ── タスク操作 ──
+async function addTask(sec,q){
+  const inp=document.getElementById('i-'+sec+'-'+q);
+  const txt=inp.value.trim(); if(!txt)return; inp.value='';
+  const other=sec==='K'?'Y':'K';
+  const now=new Date().toISOString();
+  if(q==='q3'){
+    S.tasks.push({id:'tmp'+Date.now(),section:sec,text:txt,quadrant:'q3',status:'active',created_at:now});
+    S.tasks.push({id:'tmp'+(Date.now()+1),section:other,text:txt,quadrant:'q1',status:'active',created_at:now});
+  } else {
+    S.tasks.push({id:'tmp'+Date.now(),section:sec,text:txt,quadrant:q,status:'active',created_at:now});
+  }
+  renderAll();
+  if(q==='q3'){
+    await Promise.all([
+      post({action:'addTask',section:sec,text:txt,quadrant:'q3'}),
+      post({action:'addTask',section:other,text:txt,quadrant:'q1'})
+    ]).catch(e=>toast('同期エラー',1));
+  } else {
+    await post({action:'addTask',section:sec,text:txt,quadrant:q}).catch(e=>toast('同期エラー',1));
+  }
+  loadAll(true);
+}
+
+function restoreTask(id){
+  const t=S.tasks.find(t=>String(t.id)===String(id)); if(t) t.status='active';
   renderAll();
   syncBg({action:'updateTask',id,status:'active'});
 }
-async function delTask(id){
+
+function delTask(id){
   if(!confirm('削除しますか？'))return;
-  S.tasks=S.tasks.filter(t=>t.id!==id);
+  S.tasks=S.tasks.filter(t=>String(t.id)!==String(id));
   renderAll();
   syncBg({action:'deleteTask',id});
 }
-async function addReq(from,to){
-  const key=from.toLowerCase()+'t'+to.toLowerCase();
-  const inp=document.getElementById(key+'-in');
-  const txt=inp.value.trim(); if(!txt)return; inp.value='';
-  try{ await post({action:'addRequest',from_user:from,to_user:to,text:txt}); await loadAll(); toast('依頼を送りました！'); }catch(e){ toast('エラー',1); }
-}
+
+function toggleDn(sec){ DNopen[sec]=!DNopen[sec]; renderMx(sec); }
+
+// ── 依頼 ──
 async function doneReq(id){
-  const r=S.reqs.find(r=>r.id===id); if(r) r.status='done';
-  renderAll(); toast('完了！');
+  const r=S.reqs.find(r=>String(r.id)===String(id)); if(r) r.status='done';
+  renderAll();
   syncBg({action:'updateRequest',id,status:'done'});
 }
 async function delReq(id){
   if(!confirm('削除しますか？'))return;
-  S.reqs=S.reqs.filter(r=>r.id!==id);
+  S.reqs=S.reqs.filter(r=>String(r.id)!==String(id));
   renderAll();
   syncBg({action:'deleteRequest',id});
 }
-async function addOrder(){
-  const id=document.getElementById('oi-id').value.trim();
-  const buyer=document.getElementById('oi-buyer').value.trim();
-  const item=document.getElementById('oi-item').value.trim();
-  const amt=document.getElementById('oi-amt').value.trim();
-  const note=document.getElementById('oi-note').value.trim();
-  if(!id||!buyer||!item){alert('注文番号・商品名・バイヤー名は必須');return;}
-  try{
-    await post({action:'addOrder',order_id:id,item_name:item,buyer,amount_usd:amt,notes:note});
-    ['oi-id','oi-buyer','oi-item','oi-amt','oi-note'].forEach(i=>document.getElementById(i).value=''); orderWho=''; ['k','y','b'].forEach(x=>document.getElementById('owho-'+x).classList.remove('sel'));
-    await loadAll(); toast('受注登録しました！');
-  }catch(e){ toast('エラー',1); }
+
+// ── 発送管理 ──
+function renderOrders(){
+  const el=document.getElementById('orders');
+  if(!el) return;
+  const active=S.orders.filter(o=>parseInt(o.step)<6).reverse();
+  if(!active.length){ el.innerHTML='<div style="text-align:center;padding:30px;color:#ccc;font-size:13px">受注なし</div>'; return; }
+  el.innerHTML=active.map(o=>{
+    const step=parseInt(o.step)||1;
+    return `<div class="oc">
+      <div class="oc-hdr">
+        <div>
+          <div class="oc-id">${esc(o.order_id)}${o.amount_usd?' · $'+o.amount_usd:''}</div>
+          <div class="oc-name">${esc(o.item_name)}</div>
+          <div class="oc-buyer">👤 ${esc(o.buyer)}</div>
+        </div>
+        <span class="oc-del" onclick="delOrder('${esc(o.order_id)}')">×</span>
+      </div>
+      <div class="steps">
+        ${STEPS.map((s,i)=>{
+          const sn=i+1;
+          const cls=sn<step?'done':sn===step?'cur':'';
+          return `${i?'<span class="sarr">›</span>':''}<div class="step ${cls}" onclick="updStep('${esc(o.order_id)}',${sn})">${s}</div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:8px;text-align:right;">
+        <button onclick="openSReq('${esc(o.order_id)}','${esc(o.item_name)}')" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid var(--req);background:transparent;color:var(--req);cursor:pointer;font-family:inherit;">🔁 ステップを依頼</button>
+      </div>
+      ${o.notes?`<div style="font-size:11px;color:#999;margin-top:6px">📝 ${esc(o.notes)}</div>`:''}
+    </div>`;
+  }).join('');
 }
-async function updStep(oid,step){
+
+function updStep(oid,step){
   const o=S.orders.find(o=>o.order_id===oid);
-  const oName=o?o.item_name:'';
   if(o) o.step=step;
-  renderOrders(); toast(STEPS[step-1]+' ✓');
+  renderOrders();
+  toast(STEPS[step-1]+' ✓');
   syncBg({action:'updateOrderStep',order_id:oid,step});
-  // Chatwork通知（GASの成否に関係なく送信）
+  // Chatwork通知
   const cwt=localStorage.getItem('ky_cw_token')||'';
   if(cwt){
-    const msg=`[info][title][emoji:star]発送進捗[/title]${ME}が (${oid} / ${oName}) の「${STEPS[step-1]}」を完了しました[/info]`;
-    post({action:'sendChatwork',token:cwt,room:CW_ROOM_ORDER,message:msg}).catch(e=>console.error('CW error:',e));
+    const msg=`[info][title]📦 発送進捗[/title]${ME}が (${oid}/${o?o.item_name:''}) の「${STEPS[step-1]}」を完了[/info]`;
+    post({action:'sendChatwork',token:cwt,room:CW_ROOM_ORDER,message:msg}).catch(()=>{});
   }
 }
-async function delOrder(oid){
+
+function delOrder(oid){
   if(!confirm('受注を削除しますか？'))return;
   S.orders=S.orders.filter(o=>o.order_id!==oid);
   renderOrders();
   syncBg({action:'deleteOrder',order_id:oid});
 }
 
-// ── UI ──
-function showTab(id,el){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('act'));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
-  document.getElementById(id).classList.add('act');
-  el.classList.add('act');
-}
-function toggleDn(sec){ DNopen[sec]=!DNopen[sec]; renderMx(sec); }
-
-
-// ── 編集モーダル ──
-let editTaskId='', editSec='', lpTimer=null;
-
-function startLongPress(id,sec){
-  lpTimer=setTimeout(()=>editTask(null,id,sec), 600);
-}
-function clearLongPress(){
-  if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; }
-}
-function editTask(e,id,sec){
-  if(e) e.preventDefault();
-  const t=S.tasks.find(t=>String(t.id)===String(id)); if(!t) return;
-  editTaskId=id; editSec=sec;
-  document.getElementById('edit-input').value=t.text;
-  document.getElementById('edit-overlay').style.display='block';
-  document.getElementById('edit-modal').style.display='block';
-  setTimeout(()=>document.getElementById('edit-input').focus(),100);
-}
-function closeEdit(){
-  document.getElementById('edit-overlay').style.display='none';
-  document.getElementById('edit-modal').style.display='none';
-}
-async function saveEdit(){
-  const newText=document.getElementById('edit-input').value.trim();
-  if(!newText){alert('テキストを入力してください');return;}
-  const t=S.tasks.find(t=>String(t.id)===String(editTaskId)); if(!t) return;
-  const oldText=t.text;
-  // ローカルで同テキストのタスクを全部更新
-  S.tasks.filter(x=>x.text.trim()===oldText.trim())
-    .forEach(x=>{ x.text=newText; });
-  closeEdit(); renderAll(); toast('更新しました！');
-  // GASに保存
-  post({action:'updateTask',id:editTaskId,text:newText}).catch(e=>toast('同期エラー',1));
-}
-// ── 仕入れモーダル ──
-
-// ── ステップ依頼モーダル ──
-let sReqOrderId="", sReqItemName="", sReqStep="", sReqWho="";
-
-function openSReq(oid, iname){
-  sReqOrderId=oid; sReqItemName=iname; sReqStep=""; sReqWho="";
-  document.getElementById("sreq-item-name").textContent=iname;
-  const stepsEl=document.getElementById("sreq-steps");
-  stepsEl.innerHTML=STEPS.map((s,i)=>{
-    const sn=String(i+1);
-    return `<button id="sreqst-${sn}" onclick="selectSReqStep('${sn}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid #e0e0e0;background:white;font-size:11px;font-weight:700;color:#888;cursor:pointer;font-family:inherit;">${s}</button>`;
-  }).join("");
-  ["k","y"].forEach(x=>{ const b=document.getElementById("sreq-"+x); b.style.background="white"; b.style.borderColor="var(--border)"; });
-  document.getElementById("sreq-overlay").style.display="block";
-  document.getElementById("sreq-modal").style.display="block";
-}
-
-function closeSReq(){
-  document.getElementById("sreq-overlay").style.display="none";
-  document.getElementById("sreq-modal").style.display="none";
-}
-
-function selectSReqStep(sn){
-  sReqStep=sn;
-  STEPS.forEach((_,i)=>{
-    const b=document.getElementById("sreqst-"+(i+1));
-    if(b){ b.style.background=String(i+1)===sn?"var(--req)":"white"; b.style.color=String(i+1)===sn?"white":"#888"; b.style.borderColor=String(i+1)===sn?"var(--req)":"#e0e0e0"; }
+// ── 完了記録 ──
+function renderArchive(){
+  const el=document.getElementById('arc-list');
+  if(!el) return;
+  const doneTasks=S.tasks.filter(t=>t.status==='done');
+  const doneOrders=S.orders.filter(o=>parseInt(o.step)>=6);
+  let items=[];
+  doneTasks.forEach(t=>items.push({type:'task',data:t}));
+  doneOrders.forEach(o=>items.push({type:'order',data:o}));
+  items.sort((a,b)=>{
+    const da=(a.data._doneAt||a.data.done_at||'').slice(0,10);
+    const db=(b.data._doneAt||b.data.done_at||'').slice(0,10);
+    return da===db?0:da>db?-1:1;
   });
-}
-
-function selectSReqWho(who){
-  sReqWho=who;
-  const kb=document.getElementById("sreq-k"); const yb=document.getElementById("sreq-y");
-  kb.style.background=who==="K"?"var(--k)":"white"; kb.style.color=who==="K"?"white":"var(--k)"; kb.style.borderColor=who==="K"?"var(--k)":"var(--border)";
-  yb.style.background=who==="Y"?"var(--y)":"white"; yb.style.color=who==="Y"?"white":"var(--y)"; yb.style.borderColor=who==="Y"?"var(--y)":"var(--border)";
-}
-
-async function submitSReq(){
-  if(!sReqStep){alert("ステップを選んでください");return;}
-  if(!sReqWho){alert("依頼する人を選んでください");return;}
-  const stepName=STEPS[parseInt(sReqStep)-1];
-  const from=ME; const to=sReqWho;
-  if(from===to){alert("自分には依頼できません");return;}
-  const txt="📦 "+sReqItemName+" | "+stepName;
-  try{
-    await post({action:"addRequest",from_user:from,to_user:to,text:txt});
-    closeSReq(); await loadAll(); toast(to+"さんに依頼しました！");
-  }catch(e){ toast("エラー: "+e.message,1); }
-}
-
-// ── 発送モーダル ──
-function toggleHasso(){
-  const ov=document.getElementById("hasso-overlay");
-  const md=document.getElementById("hasso-modal");
-  const isOpen=md.style.display!=="none";
-  ov.style.display=isOpen?"none":"block";
-  md.style.display=isOpen?"none":"block";
-  if(!isOpen) setTimeout(()=>document.getElementById("hasso-id").focus(),100);
-}
-function closeHasso(){
-  document.getElementById("hasso-overlay").style.display="none";
-  document.getElementById("hasso-modal").style.display="none";
-}
-async function addHasso(){
-  const item=document.getElementById("hasso-item").value.trim();
-  const id=document.getElementById("hasso-id").value.trim();
-  const buyer=document.getElementById("hasso-buyer").value.trim();
-  const amt=document.getElementById("hasso-amt").value.trim();
-  const note=document.getElementById("hasso-note").value.trim();
-  if(!item||!id||!buyer){alert("商品名・注文番号・バイヤー名は必須");return;}
-  try{
-    await post({action:"addOrder",order_id:id,item_name:item,buyer:buyer,amount_usd:amt,notes:note});
-    ["hasso-item","hasso-id","hasso-buyer","hasso-amt","hasso-note"].forEach(x=>document.getElementById(x).value="");
-    closeHasso(); await loadAll(); toast("受注登録しました！");
-  }catch(e){ toast("エラー: "+e.message,1); }
-  // Chatwork通知（try/catch外で必ず実行）
-  const cwtH=localStorage.getItem('ky_cw_token')||'';
-  if(cwtH){
-    const amtStr=amt?` $${amt}`:'';
-    const msg=`[info][title][emoji:star]受注登録[/title]${ME}が受注登録しました\n注文番号：${id}\n商品：${item}\nバイヤー：${buyer}${amtStr}[/info]`;
-    post({action:'sendChatwork',token:cwtH,room:CW_ROOM_ORDER,message:msg}).catch(e=>console.error('CW error:',e));
-  }
-}
-function toggleShiire(){
-  const ov=document.getElementById("shiire-overlay");
-  const md=document.getElementById("shiire-modal");
-  const isOpen=md.style.display!=="none";
-  ov.style.display=isOpen?"none":"block";
-  md.style.display=isOpen?"none":"block";
-  if(!isOpen) setTimeout(()=>document.getElementById("shiire-name").focus(),100);
-}
-function closeShiire(){
-  document.getElementById("shiire-overlay").style.display="none";
-  document.getElementById("shiire-modal").style.display="none";
-}
-async function addShiire(){
-  const name=document.getElementById("shiire-name").value.trim();
-  const jan=document.getElementById("shiire-jan").value.trim();
-  if(!name){alert("商品名を入力してください");return;}
-  const txt=jan?"[JAN:"+jan+"] "+name:name;
-  try{
-    await Promise.all([
-      post({action:"addTask",section:"K",text:txt,quadrant:"q2"}),
-      post({action:"addTask",section:"Y",text:txt,quadrant:"q2"})
-    ]);
-    document.getElementById("shiire-name").value="";
-    document.getElementById("shiire-jan").value="";
-    closeShiire();
-    await loadAll();
-    toast("K・Yの計画するに追加しました！");
-    // Chatwork通知
-    const cwt=localStorage.getItem('ky_cw_token')||'';
-    if(cwt){
-      const msg=`[info][title]🛒 仕入れ登録[/title]${ME}が「${txt}」を仕入れ登録しました。K・Yの計画するに追加済み[/info]`;
-      post({action:'sendChatwork',token:cwt,room:CW_ROOM_SHIIRE,message:msg}).catch(e=>console.error('CW error:',e));
-    }
-  }catch(e){ toast("エラー: "+e.message,1); }
-}
-function toast(msg,err=0){
-  const el=document.getElementById('toast');
-  el.textContent=msg; el.style.background=err?'#e53935':'#333';
-  el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2200);
-}
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ── ARCHIVE ──
-let arcMode = 'all';
-
-function renderArchive() {
-  const el = document.getElementById('arc-list');
-  if (!el) return;
-
-  const doneTasks = S.tasks.filter(t => t.status === 'done');
-  const doneReqs  = S.reqs.filter(r => r.status === 'done');
-  const doneOrders = S.orders.filter(o => parseInt(o.step) >= 6);
-
-  let items = [];
-
-  if (arcMode === 'all' || arcMode === 'K')
-    doneTasks.filter(t => t.section === 'K').forEach(t => items.push({type:'task', sec:'K', data:t}));
-  if (arcMode === 'all' || arcMode === 'Y')
-    doneTasks.filter(t => t.section === 'Y').forEach(t => items.push({type:'task', sec:'Y', data:t}));
-  if (arcMode === 'all' || arcMode === 'req')
-    doneReqs.forEach(r => items.push({type:'req', data:r}));
-  if (arcMode === 'all' || arcMode === 'ship')
-    doneOrders.forEach(o => items.push({type:'order', data:o}));
-
-  // 日付降順
-  items.sort((a,b) => {
-    const da = (a.data._doneAt || a.data.done_at || '').slice(0,10);
-    const db = (b.data._doneAt || b.data.done_at || '').slice(0,10);
-    return da===db ? 0 : da > db ? -1 : 1;
-  });
-
-  if (!items.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:#ccc;font-size:13px">完了記録なし</div>';
-    return;
-  }
-
-  el.innerHTML = items.map(item => {
-    if (item.type === 'task') {
-      const q = QM[item.data.quadrant] || {l:'?',c:'#aaa'};
-      const sColor = item.sec === 'K' ? 'var(--k)' : 'var(--y)';
-      const sLabel = item.sec === 'K' ? '🙋 K' : '👤 Y';
+  if(!items.length){ el.innerHTML='<div style="text-align:center;padding:40px;color:#ccc;font-size:13px">完了記録なし</div>'; return; }
+  el.innerHTML=items.map(item=>{
+    if(item.type==='task'){
+      const q=QM[item.data.quadrant]||{l:'?',c:'#aaa'};
+      const sc=item.data.section==='K'?'var(--k)':'var(--y)';
       return `<div class="arc-card">
         <div class="arc-icon">✅</div>
         <div class="arc-body">
           <div class="arc-txt">${esc(item.data.text)}</div>
           <div class="arc-meta">
-            <span class="arc-tag" style="background:${sColor}22;color:${sColor}">${sLabel}</span>
+            <span class="arc-tag" style="background:${sc}22;color:${sc}">${item.data.section}</span>
             <span class="arc-tag" style="background:${q.c}22;color:${q.c}">${q.l}</span>
-            ${item.data.done_at ? '<span>📅 '+item.data.done_at+'</span>' : ''}
+            ${item.data.done_at?'<span>📅 '+item.data.done_at+'</span>':''}
           </div>
         </div>
-        <span class="arc-restore" title="元に戻す" onclick="restoreTask('${item.data.id}')">↩</span>
+        <span class="rb" onclick="restoreTask('${item.data.id}')">↩</span>
+        <span class="xb" onclick="delTask('${item.data.id}')">×</span>
       </div>`;
-    }
-    if (item.type === 'req') {
-      const fc = item.data.from_user==='K'?'var(--k)':'var(--y)';
-      const tc = item.data.to_user==='K'?'var(--k)':'var(--y)';
-      return `<div class="arc-card">
-        <div class="arc-icon">🔁</div>
-        <div class="arc-body">
-          <div class="arc-txt">${esc(item.data.text)}</div>
-          <div class="arc-meta">
-            <span class="arc-tag" style="background:${fc}22;color:${fc}">${item.data.from_user}</span>
-            <span style="color:#ccc">→</span>
-            <span class="arc-tag" style="background:${tc}22;color:${tc}">${item.data.to_user}</span>
-            ${item.data.done_at ? '<span>📅 '+item.data.done_at+'</span>' : ''}
-          </div>
-        </div>
-        <span class="arc-restore" title="削除" onclick="delReq('${item.data.id}')">×</span>
-      </div>`;
-    }
-    if (item.type === 'order') {
+    } else {
       return `<div class="arc-card">
         <div class="arc-icon">📦</div>
         <div class="arc-body">
           <div class="arc-txt">${esc(item.data.item_name)}</div>
           <div class="arc-meta">
-            <span class="arc-tag" style="background:#43a04722;color:#43a047">発送完了</span>
-            <span>👤 ${esc(item.data.buyer)}</span>
-            ${item.data.amount_usd ? '<span>$'+item.data.amount_usd+'</span>' : ''}
             <span>${esc(item.data.order_id)}</span>
+            <span>👤 ${esc(item.data.buyer)}</span>
+            ${item.data.amount_usd?'<span>$'+item.data.amount_usd+'</span>':''}
           </div>
         </div>
       </div>`;
     }
-    return '';
   }).join('');
 }
 
-function arcFilter(mode, el) {
-  arcMode = mode;
-  document.querySelectorAll('.arc-f').forEach(b => b.classList.remove('act'));
-  el.classList.add('act');
+function arcFilter(mode,el){
+  arcMode=mode;
+  document.querySelectorAll('.arc-f').forEach(b=>b.classList.remove('act'));
+  if(el) el.classList.add('act');
   renderArchive();
 }
 
+// ── タブ ──
+function showTab(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
+  document.getElementById(id).style.display='block';
+  if(el) el.classList.add('act');
+}
+
+// ── 編集（ロングタップ） ──
+function startLongPress(id,sec){
+  lpTimer=setTimeout(()=>{
+    editTaskId=id; editSec=sec;
+    const t=S.tasks.find(t=>String(t.id)===String(id));
+    if(!t) return;
+    document.getElementById('edit-input').value=t.text;
+    document.getElementById('edit-overlay').style.display='block';
+    document.getElementById('edit-modal').style.display='block';
+    setTimeout(()=>document.getElementById('edit-input').focus(),100);
+  },600);
+}
+function clearLongPress(){ if(lpTimer){clearTimeout(lpTimer);lpTimer=null;} }
+function closeEdit(){
+  document.getElementById('edit-overlay').style.display='none';
+  document.getElementById('edit-modal').style.display='none';
+}
+function saveEdit(){
+  const newText=document.getElementById('edit-input').value.trim();
+  if(!newText){alert('テキストを入力してください');return;}
+  const t=S.tasks.find(t=>String(t.id)===String(editTaskId));
+  if(!t) return;
+  const oldText=t.text;
+  S.tasks.filter(x=>x.text.trim()===oldText.trim()).forEach(x=>x.text=newText);
+  closeEdit(); renderAll(); toast('更新しました！');
+  syncBg({action:'updateTask',id:editTaskId,text:newText});
+}
+
+// ── ステップ依頼モーダル ──
+function openSReq(oid,iname){
+  sReqOrderId=oid; sReqItemName=iname; sReqStep=''; sReqWho='';
+  document.getElementById('sreq-item-name').textContent=iname;
+  const stepsEl=document.getElementById('sreq-steps');
+  stepsEl.innerHTML=STEPS.map((s,i)=>{
+    const sn=String(i+1);
+    return `<button id="sreqst-${sn}" onclick="selectSReqStep('${sn}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid #e0e0e0;background:white;font-size:11px;font-weight:700;color:#888;cursor:pointer;font-family:inherit;">${s}</button>`;
+  }).join('');
+  ['k','y'].forEach(x=>{const b=document.getElementById('sreq-'+x);if(b){b.style.background='white';b.style.borderColor='var(--border)';}});
+  document.getElementById('sreq-overlay').style.display='block';
+  document.getElementById('sreq-modal').style.display='block';
+}
+function closeSReq(){
+  document.getElementById('sreq-overlay').style.display='none';
+  document.getElementById('sreq-modal').style.display='none';
+}
+function selectSReqStep(sn){
+  sReqStep=sn;
+  STEPS.forEach((_,i)=>{
+    const b=document.getElementById('sreqst-'+(i+1));
+    if(b){b.style.background=String(i+1)===sn?'var(--req)':'white';b.style.color=String(i+1)===sn?'white':'#888';b.style.borderColor=String(i+1)===sn?'var(--req)':'#e0e0e0';}
+  });
+}
+function selectSReqWho(who){
+  sReqWho=who;
+  const kb=document.getElementById('sreq-k');const yb=document.getElementById('sreq-y');
+  if(kb){kb.style.background=who==='K'?'var(--k)':'white';kb.style.color=who==='K'?'white':'var(--k)';kb.style.borderColor=who==='K'?'var(--k)':'var(--border)';}
+  if(yb){yb.style.background=who==='Y'?'var(--y)':'white';yb.style.color=who==='Y'?'white':'var(--y)';yb.style.borderColor=who==='Y'?'var(--y)':'var(--border)';}
+}
+async function submitSReq(){
+  if(!sReqStep){alert('ステップを選んでください');return;}
+  if(!sReqWho){alert('依頼する人を選んでください');return;}
+  const stepName=STEPS[parseInt(sReqStep)-1];
+  const from=ME; const to=sReqWho;
+  if(from===to){alert('自分には依頼できません');return;}
+  const txt='📦 '+sReqItemName+' | '+stepName;
+  try{
+    await post({action:'addRequest',from_user:from,to_user:to,text:txt});
+    closeSReq(); await loadAll(); toast(to+'さんに依頼しました！');
+  }catch(e){toast('エラー: '+e.message,1);}
+}
+
+// ── 仕入れモーダル ──
+function toggleShiire(){
+  const ov=document.getElementById('shiire-overlay');
+  const md=document.getElementById('shiire-modal');
+  const open=md.style.display!=='none';
+  ov.style.display=open?'none':'block';
+  md.style.display=open?'none':'block';
+  if(!open) setTimeout(()=>document.getElementById('shiire-name').focus(),100);
+}
+function closeShiire(){
+  document.getElementById('shiire-overlay').style.display='none';
+  document.getElementById('shiire-modal').style.display='none';
+}
+async function addShiire(){
+  const name=document.getElementById('shiire-name').value.trim();
+  const jan=document.getElementById('shiire-jan').value.trim();
+  if(!name){alert('商品名を入力してください');return;}
+  const txt=jan?'[JAN:'+jan+'] '+name:name;
+  try{
+    await Promise.all([
+      post({action:'addTask',section:'K',text:txt,quadrant:'q2'}),
+      post({action:'addTask',section:'Y',text:txt,quadrant:'q2'})
+    ]);
+    document.getElementById('shiire-name').value='';
+    document.getElementById('shiire-jan').value='';
+    closeShiire();
+    await loadAll();
+    toast('K・Yの計画するに追加しました！');
+    const cwt=localStorage.getItem('ky_cw_token')||'';
+    if(cwt){
+      post({action:'sendChatwork',token:cwt,room:CW_ROOM_SHIIRE,
+        message:`[info][title]🛒 仕入れ登録[/title]${ME}が「${txt}」を登録しました[/info]`}).catch(()=>{});
+    }
+  }catch(e){toast('エラー: '+e.message,1);}
+}
+
+// ── 受注モーダル ──
+function toggleHasso(){
+  const ov=document.getElementById('hasso-overlay');
+  const md=document.getElementById('hasso-modal');
+  const open=md.style.display!=='none';
+  ov.style.display=open?'none':'block';
+  md.style.display=open?'none':'block';
+  if(!open) setTimeout(()=>document.getElementById('hasso-id').focus(),100);
+}
+function closeHasso(){
+  document.getElementById('hasso-overlay').style.display='none';
+  document.getElementById('hasso-modal').style.display='none';
+}
+async function addHasso(){
+  const id=document.getElementById('hasso-id').value.trim();
+  const item=document.getElementById('hasso-item').value.trim();
+  const buyer=document.getElementById('hasso-buyer').value.trim();
+  const amt=document.getElementById('hasso-amt').value.trim();
+  const note=document.getElementById('hasso-note').value.trim();
+  if(!item||!id||!buyer){alert('注文番号・商品名・バイヤー名は必須');return;}
+  try{
+    await post({action:'addOrder',order_id:id,item_name:item,buyer,amount_usd:amt,notes:note});
+    ['hasso-id','hasso-item','hasso-buyer','hasso-amt','hasso-note'].forEach(x=>document.getElementById(x).value='');
+    closeHasso(); await loadAll(); toast('受注登録しました！');
+    const cwt=localStorage.getItem('ky_cw_token')||'';
+    if(cwt){
+      post({action:'sendChatwork',token:cwt,room:CW_ROOM_ORDER,
+        message:`[info][title]📦 新規受注[/title]${ME}が受注登録
+注文番号：${id}
+商品：${item}
+バイヤー：${buyer}${amt?' $'+amt:''}[/info]`}).catch(()=>{});
+    }
+  }catch(e){toast('エラー: '+e.message,1);}
+}
+
+// ── トースト ──
+function toast(msg,err=0){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.style.background=err?'#e53935':'#333';
+  el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2200);
+}
+
+// setOrderWho（発送タブの担当選択）
+function setOrderWho(v){
+  orderWho=v;
+  ['k','y','b'].forEach(x=>{const el=document.getElementById('owho-'+x);if(el)el.classList.remove('sel');});
+  const map={K:'k',Y:'y',KY:'b'};
+  if(map[v]){const el=document.getElementById('owho-'+map[v]);if(el)el.classList.add('sel');}
+}
 </script>
 </body>
 </html>
