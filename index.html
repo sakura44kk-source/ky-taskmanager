@@ -525,15 +525,14 @@ async function doneTask(id,sec){
   const t=S.tasks.find(t=>t.id===id); if(!t) return;
   const now=new Date().toISOString();
   t.status='done'; t._doneAt=now;
-  // 同じテキストの相手タスクも完了
   const other=sec==='K'?'Y':'K';
   const twin=S.tasks.find(x=>x.section===other&&x.text.trim()===t.text.trim()&&x.status==='active');
   if(twin){ twin.status='done'; twin._doneAt=now; }
   DNopen[sec]=true; renderAll();
-  // GASに両方同時に保存（awaitで確実に）
-  const calls=[post({action:'updateTask',id,status:'done'})];
-  if(twin) calls.push(post({action:'updateTask',id:twin.id,status:'done'}));
-  await Promise.all(calls).catch(e=>console.error('done sync error:',e));
+  // GASに両方確実に保存
+  const doneCalls=[post({action:'updateTask',id,status:'done'})];
+  if(twin) doneCalls.push(post({action:'updateTask',id:twin.id,status:'done'}));
+  Promise.all(doneCalls).catch(e=>toast('同期エラー: '+e.message,1));
 }
 async function restoreTask(id){
   const t=S.tasks.find(t=>t.id===id); if(t) t.status='active';
