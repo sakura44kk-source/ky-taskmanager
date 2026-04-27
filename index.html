@@ -516,31 +516,41 @@ async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
   if(!checked.length){ toast('選択なし',1); return; }
   const now=new Date().toISOString();
-  const toUpdate=[]; // GASに送るID一覧
-  checked.forEach(id=>{
-    const t=S.tasks.find(t=>String(t.id)===String(id));
-    if(t){
-      // ローカルでK・Y両方のテキスト一致を全部完了
-      S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
-        .forEach(x=>{
-          x.status='done'; x._doneAt=now;
-          if(!toUpdate.find(u=>String(u)===String(x.id))) toUpdate.push(x.id);
+  // 完了させるIDを全部収集（K・Y両方のtwin含む）
+  const doneIds=new Set();
+  checked.forEach(cid=>{
+    S.tasks.forEach(x=>{
+      if(String(x.id)===String(cid)) {
+        // このタスクと同テキストのものを全部完了
+        S.tasks.forEach(y=>{
+          if(y.text.trim()===x.text.trim()&&y.status==='active'){
+            y.status='done'; y._doneAt=now;
+            doneIds.add(String(y.id));
+          }
         });
-    }
+      }
+    });
   });
   DNopen[sec]=true; bulkSel[sec]={};
-  renderAll(); toast(checked.length+'件を完了しました！');
-  // GASに個別で保存（再デプロイ不要）
-  toUpdate.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>toast('同期エラー',1)));
+  renderAll();
+  toast(checked.length+'件を完了しました！');
+  doneIds.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>console.error(e)));
 }
 async function doneTask(id,sec){
-  const t=S.tasks.find(t=>String(t.id)===String(id)); if(!t) return;
   const now=new Date().toISOString();
-  const toUpdate=[];
-  S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
-    .forEach(x=>{ x.status='done'; x._doneAt=now; toUpdate.push(x.id); });
+  const doneIds=new Set();
+  // 押したタスクのテキストを取得
+  const base=S.tasks.find(x=>String(x.id)===String(id));
+  if(!base) return;
+  // 同テキストのK・Y両方を完了
+  S.tasks.forEach(x=>{
+    if(x.text.trim()===base.text.trim()&&x.status==='active'){
+      x.status='done'; x._doneAt=now;
+      doneIds.add(String(x.id));
+    }
+  });
   DNopen[sec]=true; renderAll();
-  toUpdate.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>toast('同期エラー',1)));
+  doneIds.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>console.error(e)));
 }
 async function restoreTask(id){
   const t=S.tasks.find(t=>t.id===id); if(t) t.status='active';
@@ -799,7 +809,7 @@ function renderArchive() {
   items.sort((a,b) => {
     const da = (a.data._doneAt || a.data.done_at || '').slice(0,10);
     const db = (b.data._doneAt || b.data.done_at || '').slice(0,10);
-    return db > da ? 1 : db < da ? -1 : 0;
+    return da===db ? 0 : da > db ? -1 : 1;
   });
 
   if (!items.length) {
