@@ -281,7 +281,7 @@ const QM={
   q1:{l:'今すぐやる',c:'var(--q1)',bg:'var(--q1bg)',bd:'var(--q1bd)'},
   q2:{l:'計画する',  c:'var(--q2)',bg:'var(--q2bg)',bd:'var(--q2bd)'},
   q3:{l:'任せる',    c:'var(--q3)',bg:'var(--q3bg)',bd:'var(--q3bd)'},
-  q4:{l:'やめる',    c:'var(--q4)',bg:'var(--q4bg)',bd:'var(--q4bd)'},
+  q4:{l:'📦 発送中',  c:'var(--q4)',bg:'var(--q4bg)',bd:'var(--q4bd)'},
 };
 const CW_ROOM_ORDER='423443544';
 const CW_ROOM_SHIIRE='423443517';
@@ -407,6 +407,7 @@ function renderMx(sec){
             </div>
             <span class="tt"
               onclick="toggleBulk(${JSON.stringify(t.text)},'${sec}')"
+              oncontextmenu="editTask(event,${JSON.stringify(String(t.id))},'${sec}');return false;"
               ontouchstart="startLongPress(${JSON.stringify(String(t.id))},'${sec}')"
               ontouchend="clearLongPress()"
               ontouchmove="clearLongPress()">${esc(t.text)}</span>
@@ -673,6 +674,16 @@ function startLongPress(id,sec){
   },600);
 }
 function clearLongPress(){ if(lpTimer){clearTimeout(lpTimer);lpTimer=null;} }
+function editTask(e,id,sec){
+  if(e) e.preventDefault();
+  editTaskId=id; editSec=sec;
+  const t=S.tasks.find(t=>String(t.id)===String(id));
+  if(!t) return;
+  document.getElementById('edit-input').value=t.text;
+  document.getElementById('edit-overlay').style.display='block';
+  document.getElementById('edit-modal').style.display='block';
+  setTimeout(()=>document.getElementById('edit-input').focus(),100);
+}
 function closeEdit(){
   document.getElementById('edit-overlay').style.display='none';
   document.getElementById('edit-modal').style.display='none';
