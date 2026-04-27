@@ -507,21 +507,33 @@ async function bulkDone(sec){
   const checked = Object.keys(bulkSel[sec]||{});
   if(!checked.length) return;
   const now=new Date().toISOString();
+  const other=sec==='K'?'Y':'K';
   checked.forEach(id=>{
     const t=S.tasks.find(t=>t.id===id);
-    if(t){ t.status='done'; t._doneAt=now; }
+    if(t){
+      t.status='done'; t._doneAt=now;
+      // 相手の同テキストも完了
+      const twin=S.tasks.find(x=>x.section===other&&x.text===t.text&&x.status==='active');
+      if(twin){ twin.status='done'; twin._doneAt=now; syncBg({action:'updateTask',id:twin.id,status:'done'}); }
+    }
   });
   DNopen[sec]=true; bulkSel[sec]={};
   renderAll(); toast(checked.length+'件を完了しました！');
-  // バックグラウンド同期
   checked.forEach(id=>syncBg({action:'updateTask',id,status:'done'}));
 }
 async function doneTask(id,sec){
-  // ローカル即時更新
-  const t=S.tasks.find(t=>t.id===id); if(t){ t.status='done'; t._doneAt=new Date().toISOString(); }
-  DNopen[sec]=true; renderMx(sec);
-  // バックグラウンド同期
-  syncBg({action:'updateTask',id,status:'done'});
+  const t=S.tasks.find(t=>t.id===id); if(!t) return;
+  const now=new Date().toISOString();
+  t.status='done'; t._doneAt=now;
+  // 同じテキストの相手タスクも完了
+  const other=sec==='K'?'Y':'K';
+  const twin=S.tasks.find(x=>x.section===other&&x.text.trim()===t.text.trim()&&x.status==='active');
+  if(twin){ twin.status='done'; twin._doneAt=now; }
+  DNopen[sec]=true; renderAll();
+  // GASに両方同時に保存（awaitで確実に）
+  const calls=[post({action:'updateTask',id,status:'done'})];
+  if(twin) calls.push(post({action:'updateTask',id:twin.id,status:'done'}));
+  await Promise.all(calls).catch(e=>console.error('done sync error:',e));
 }
 async function restoreTask(id){
   const t=S.tasks.find(t=>t.id===id); if(t) t.status='active';
@@ -565,13 +577,15 @@ async function addOrder(){
   }catch(e){ toast('エラー',1); }
 }
 async function updStep(oid,step){
-  const o=S.orders.find(o=>o.order_id===oid); if(o) o.step=step;
+  const o=S.orders.find(o=>o.order_id===oid);
+  const oName=o?o.item_name:'';
+  if(o) o.step=step;
   renderOrders(); toast(STEPS[step-1]+' ✓');
   syncBg({action:'updateOrderStep',order_id:oid,step});
-  // Chatwork通知
+  // Chatwork通知（GASの成否に関係なく送信）
   const cwt=localStorage.getItem('ky_cw_token')||'';
-  if(cwt&&o){
-    const msg=`[info][title]📦 発送進捗[/title]${ME}が (${o.order_id} / ${o.item_name}) の「${STEPS[step-1]}」を完了しました[/info]`;
+  if(cwt){
+    const msg=`[info][title][emoji:star]発送進捗[/title]${ME}が (${oid} / ${oName}) の「${STEPS[step-1]}」を完了しました[/info]`;
     post({action:'sendChatwork',token:cwt,room:CW_ROOM_ORDER,message:msg}).catch(e=>console.error('CW error:',e));
   }
 }
@@ -666,17 +680,14 @@ async function addHasso(){
     await post({action:"addOrder",order_id:id,item_name:item,buyer:buyer,amount_usd:amt,notes:note});
     ["hasso-item","hasso-id","hasso-buyer","hasso-amt","hasso-note"].forEach(x=>document.getElementById(x).value="");
     closeHasso(); await loadAll(); toast("受注登録しました！");
-    // Chatwork通知
-    const cwt=localStorage.getItem('ky_cw_token')||'';
-    if(cwt){
-      const amtStr=amt?` $${amt}`:'';
-      const msg=`[info][title]📦 新規受注[/title]${ME}が受注登録しました
-注文番号：${id}
-商品：${item}
-バイヤー：${buyer}${amtStr}[/info]`;
-      post({action:'sendChatwork',token:cwt,room:CW_ROOM_ORDER,message:msg}).catch(e=>console.error('CW error:',e));
-    }
   }catch(e){ toast("エラー: "+e.message,1); }
+  // Chatwork通知（try/catch外で必ず実行）
+  const cwtH=localStorage.getItem('ky_cw_token')||'';
+  if(cwtH){
+    const amtStr=amt?` $${amt}`:'';
+    const msg=`[info][title][emoji:star]受注登録[/title]${ME}が受注登録しました\n注文番号：${id}\n商品：${item}\nバイヤー：${buyer}${amtStr}[/info]`;
+    post({action:'sendChatwork',token:cwtH,room:CW_ROOM_ORDER,message:msg}).catch(e=>console.error('CW error:',e));
+  }
 }
 function toggleShiire(){
   const ov=document.getElementById("shiire-overlay");
