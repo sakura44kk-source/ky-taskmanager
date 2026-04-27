@@ -388,8 +388,10 @@ function renderMx(sec){
           const sel=bulkSel[sec]&&bulkSel[sec][t.id];
           return `
           <div class="ti">
-            <div class="chk" style="border-color:${m.bd}" onclick="doneTask('${t.id}','${sec}')"></div>
-            <span class="tt" onclick="doneTask('${t.id}','${sec}')">${esc(t.text)}</span>
+            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][t.id]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}')">
+              ${bulkSel[sec]&&bulkSel[sec][t.id]?'<span style="color:white;font-size:12px;font-weight:900;line-height:1;">✓</span>':''}
+            </div>
+            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}')">${esc(t.text)}</span>
             <span class="xb" onclick="delTask('${t.id}')">×</span>
           </div>`;
         }).join('')}
@@ -502,21 +504,25 @@ function toggleBulk(id,sec,q){
   renderMx(sec);
 }
 async function bulkDone(sec){
-  const checked = Object.keys(bulkSel[sec]||{});
+  const checked=Object.keys(bulkSel[sec]||{});
   if(!checked.length) return;
   const now=new Date().toISOString();
   const texts=[];
   checked.forEach(id=>{
     const t=S.tasks.find(t=>t.id===id);
     if(t){
+      // ローカルでK・Y両方のテキスト一致を全部完了
       S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
         .forEach(x=>{ x.status='done'; x._doneAt=now; });
-      texts.push(t.text);
+      if(!texts.includes(t.text)) texts.push(t.text);
     }
   });
   DNopen[sec]=true; bulkSel[sec]={};
   renderAll(); toast(checked.length+'件を完了しました！');
-  texts.forEach(text=>post({action:'doneTaskByText',text}).catch(e=>toast('同期エラー: '+e.message,1)));
+  // GASにテキスト一致で一括完了
+  texts.forEach(text=>
+    post({action:'doneTaskByText',text}).catch(e=>toast('同期エラー: '+e.message,1))
+  );
 }
 async function doneTask(id,sec){
   const t=S.tasks.find(t=>t.id===id); if(!t) return;
