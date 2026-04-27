@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🌸 Tasks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="🌸 Tasks">
+<meta name="theme-color" content="#f0f2f5">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { overflow-x: hidden; max-width: 100%; width: 100%; }
+:root {
+  --bg:#f0f2f5; --card:#ffffff; --border:#e8eaed; --text:#1a1a2e; --sub:#888;
+  --k:#ff6b6b; --y:#7c5cbf; --req:#20b2aa; --ship:#f9a825;
+  --q1:#ff6b6b; --q1bg:#fff5f5; --q1bd:#ffd0d0;
+  --q2:#4dabf7; --q2bg:#f0f8ff; --q2bd:#bde0fd;
+  --q3:#f9a825; --q3bg:#fffde7; --q3bd:#ffe082;
+  --q4:#adb5bd; --q4bg:#f8f9fa; --q4bd:#dee2e6;
+}
+body { background:var(--bg); font-family:'Noto Sans JP','Hiragino Sans',sans-serif; min-height:100vh; overflow-x:hidden; }
+
+/* SETUP */
+#setup { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:32px 20px; gap:14px; }
+#setup h1 { font-size:26px; font-weight:900; color:var(--text); letter-spacing:-0.04em; }
+#setup p { font-size:13px; color:var(--sub); text-align:center; line-height:1.6; }
+.sinput { width:100%; max-width:400px; padding:12px 14px; border:1.5px solid var(--border); border-radius:12px; font-size:13px; outline:none; font-family:inherit; background:var(--card); }
+.sinput:focus { border-color:var(--k); }
+.sbtn { width:100%; max-width:400px; padding:14px; background:var(--text); color:white; border:none; border-radius:12px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+.usel { display:flex; gap:10px; width:100%; max-width:400px; }
+.ubtn { flex:1; padding:14px; border:2px solid var(--border); border-radius:12px; font-size:16px; font-weight:800; cursor:pointer; background:var(--card); font-family:inherit; transition:all .15s; }
+.ubtn.k { color:var(--k); } .ubtn.y { color:var(--y); }
+.ubtn.k.sel { background:var(--k); border-color:var(--k); color:white; }
+.ubtn.y.sel { background:var(--y); border-color:var(--y); color:white; }
+
+/* APP */
+#app { display:none; }
+.hdr { position:sticky; top:0; z-index:100; background:rgba(240,242,245,.95); backdrop-filter:blur(8px); padding:10px 10px 0; }
+.hdr-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.hdr-title { font-size:15px; font-weight:900; color:var(--text); letter-spacing:-0.03em; white-space:nowrap; }
+.badge { font-size:12px; font-weight:800; padding:5px 12px; border-radius:20px; color:white; cursor:pointer; letter-spacing:0.03em; }
+.tabs { display:flex; gap:2px; overflow-x:auto; padding-bottom:2px; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab { flex-shrink:0; padding:7px 10px; border-radius:10px 10px 0 0; font-size:11px; font-weight:700; cursor:pointer; background:transparent; border:none; color:var(--sub); font-family:inherit; letter-spacing:0; }
+.tab.act { background:var(--card); color:var(--text); }
+.content { padding:8px 8px 80px; overflow-x:hidden; }
+.page { overflow-x:hidden; width:100%; }
+.hdr-top { overflow:hidden; }
+.page { display:none; } .page.act { display:block; }
+
+/* EISENHOWER */
+.ax-row { display:grid; grid-template-columns:calc(50vw - 13px) calc(50vw - 13px); gap:6px; margin-bottom:5px; }
+.ax-col { text-align:center; font-size:10px; font-weight:700; }
+.gw { display:block; width:100%; overflow:hidden; }
+.ax-side { display:none; }
+.ax-lbl { display:none; }
+.grid { display:grid; grid-template-columns:calc(50vw - 13px) calc(50vw - 13px); gap:6px; }
+.qc { border-radius:12px; padding:8px 8px 6px; min-height:140px; display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+.qc-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.qc-lbl { font-size:9px; font-weight:900; letter-spacing:0.02em; }
+.qc-cnt { font-size:10px; color:#bbb; }
+.ti { display:flex; align-items:flex-start; gap:6px; margin-bottom:6px; }
+.chk { width:16px; height:16px; border-radius:4px; border:2px solid #ddd; background:white; flex-shrink:0; cursor:pointer; margin-top:1px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+.tt { font-size:11px; color:#2d2d2d; flex:1; line-height:1.4; cursor:pointer; font-weight:500; word-break:break-all; min-width:0; }
+.xb { color:#ddd; font-size:14px; cursor:pointer; flex-shrink:0; padding:0 1px; }
+.xb:hover { color:#f88; }
+.ar { display:flex; gap:4px; margin-top:auto; padding-top:6px; }
+.ai { flex:1; font-size:11px; border:none; border-bottom:1.5px solid #e0e0e0; background:transparent; outline:none; padding:2px 0; color:#555; font-family:inherit; }
+.ab { background:none; border:none; font-size:20px; cursor:pointer; padding:0 2px; line-height:1; }
+
+/* DONE */
+.done-sec { margin-top:12px; background:var(--card); border-radius:14px; overflow:hidden; border:1px solid var(--border); }
+.done-hdr { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; cursor:pointer; }
+.done-t { font-size:12px; font-weight:700; color:var(--sub); }
+.done-cv { font-size:10px; color:#bbb; transition:transform .2s; }
+.done-cv.op { transform:rotate(180deg); }
+.done-bd { padding:0 14px 10px; }
+.done-i { display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px solid #f5f5f5; }
+.done-tag { font-size:9px; font-weight:700; padding:2px 5px; border-radius:4px; flex-shrink:0; }
+.done-tt { font-size:11px; color:#bbb; text-decoration:line-through; flex:1; }
+.rb { font-size:13px; color:#ccc; cursor:pointer; }
+.rb:hover { color:#888; }
+
+/* REQUESTS */
+.rs { margin-bottom:16px; }
+.rs-title { font-size:12px; font-weight:800; padding:8px 12px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between; }
+.ri { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px; border:1px solid var(--border); }
+.rt { font-size:13px; color:var(--text); flex:1; font-weight:500; line-height:1.4; }
+.rchk { width:22px; height:22px; border-radius:6px; border:2px solid #ddd; background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all .15s; font-size:12px; color:#aaa; }
+.ra { display:flex; gap:8px; align-items:center; }
+.ra-in { flex:1; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; font-size:13px; outline:none; font-family:inherit; background:var(--card); }
+.ra-in:focus { border-color:var(--req); }
+.ra-btn { padding:10px 16px; background:var(--req); color:white; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+
+/* ORDERS */
+.oa-sec { background:var(--card); border-radius:14px; padding:14px; margin-bottom:12px; border:1px solid var(--border); }
+.oa-t { font-size:12px; font-weight:800; color:var(--sub); margin-bottom:10px; }
+.oi-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+.oi { padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-size:12px; outline:none; font-family:inherit; }
+.oi:focus { border-color:var(--ship); }
+.oi.full { grid-column:1/-1; }
+.oa-sub { width:100%; padding:10px; background:var(--ship); color:white; border:none; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+.oc { background:var(--card); border-radius:14px; padding:14px; margin-bottom:10px; border:1px solid var(--border); }
+.oc-hdr { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+.oc-id { font-size:10px; color:var(--sub); }
+.oc-name { font-size:14px; font-weight:800; color:var(--text); letter-spacing:-0.01em; }
+.oc-buyer { font-size:11px; color:var(--sub); }
+.oc-del { color:#ddd; cursor:pointer; font-size:16px; }
+.oc-del:hover { color:#f88; }
+.steps { display:flex; align-items:center; gap:3px; overflow-x:auto; }
+.steps::-webkit-scrollbar { display:none; }
+.step { flex-shrink:0; padding:5px 8px; border-radius:20px; font-size:10px; font-weight:700; cursor:pointer; border:1.5px solid #e0e0e0; background:#f8f8f8; color:#aaa; transition:all .15s; white-space:nowrap; }
+.step.done { background:#e8f5e9; border-color:#a5d6a7; color:#43a047; }
+.step.cur { background:var(--ship); border-color:var(--ship); color:white; }
+.sarr { color:#ddd; font-size:10px; flex-shrink:0; }
+
+/* MISC */
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#333; color:white; padding:10px 20px; border-radius:20px; font-size:12px; font-weight:700; opacity:0; transition:opacity .3s; z-index:999; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+.rfbtn { background:none; border:none; font-size:16px; cursor:pointer; padding:4px; color:var(--sub); }
+.empty { font-size:12px; color:#ccc; padding:8px 0; }
+
+
+.owho-btn { padding:5px 11px; border-radius:20px; font-size:11px; font-weight:500; cursor:pointer; border:1.5px solid var(--border); background:var(--card); color:var(--sub); font-family:inherit; transition:all .15s; }
+.owho-btn.sel { background:var(--text); color:white; border-color:var(--text); }
+/* ARCHIVE */
+.arc-f { padding:6px 12px; border-radius:20px; font-size:11px; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:var(--card); color:var(--sub); font-family:inherit; transition:all .15s; }
+.arc-f.act { background:var(--text); color:white; border-color:var(--text); }
+.arc-card { background:var(--card); border-radius:12px; padding:12px 14px; margin-bottom:8px; border:1px solid var(--border); display:flex; align-items:flex-start; gap:10px; }
+.arc-icon { font-size:20px; flex-shrink:0; }
+.arc-body { flex:1; min-width:0; }
+.arc-txt { font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px; letter-spacing:-0.01em; }
+.arc-meta { font-size:10px; color:var(--sub); display:flex; gap:8px; flex-wrap:wrap; }
+.arc-tag { font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; }
+.arc-restore { font-size:13px; color:#ccc; cursor:pointer; flex-shrink:0; }
+.arc-restore:hover { color:#888; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <h1>🌸 Tasks</h1>
+  <p>Apps Script の Web App URL を入力</p>
+  <input id="url-in" class="sinput" type="url" placeholder="https://script.google.com/macros/s/..."/>
+  <p style="font-size:11px;color:#bbb;margin-top:4px;">Chatwork APIトークン（任意）</p>
+  <input id="cw-token-in" class="sinput" type="text" placeholder="Chatwork APIトークン"/>
+  <p style="font-size:11px;color:#bbb">あなたは？</p>
+  <div class="usel">
+    <button class="ubtn k" id="btn-k" onclick="selUser('K')">🙋 K</button>
+    <button class="ubtn y" id="btn-y" onclick="selUser('Y')">👤 Y</button>
+  </div>
+  <button class="sbtn" onclick="saveSetup()">はじめる →</button>
+</div>
+
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-top">
+      <div class="hdr-title">🌸 Tasks</div>
+      <div style="display:flex;gap:3px;align-items:center;min-width:0;flex-shrink:0">
+        <button class="rfbtn" onclick="loadAll(false)">🔄</button>
+        <button class="badge" style="background:var(--req);font-size:10px;font-weight:800;padding:4px 7px;border-radius:20px;color:white;border:none;cursor:pointer;letter-spacing:0;font-family:inherit;white-space:nowrap;" onclick="toggleShiire()">🛒 仕入れ</button>
+        <button class="badge" style="background:var(--ship);font-size:10px;font-weight:800;padding:4px 7px;border-radius:20px;color:white;border:none;cursor:pointer;letter-spacing:0;font-family:inherit;white-space:nowrap;" onclick="toggleHasso()">📦 受注</button>
+        <div id="badge" class="badge" onclick="switchUser()"></div>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab act" onclick="showTab('pk',this)">🙋 K</button>
+      <button class="tab" onclick="showTab('py',this)">👤 Y</button>
+      <button class="tab" onclick="showTab('pship',this)">📦 発送管理</button>
+      <button class="tab" onclick="showTab('parchive',this)">📋 完了記録</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="pk" class="page act"><div id="k-mx"></div><div id="k-dn"></div></div>
+    <div id="py" class="page"><div id="y-mx"></div><div id="y-dn"></div></div>
+
+    <div id="pship" class="page">
+      <div id="orders"></div>
+    </div>
+
+    <div id="parchive" class="page">
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="arc-f act" id="af-all" onclick="arcFilter('all',this)">全員</button>
+        <button class="arc-f" id="af-k"   onclick="arcFilter('K',this)">🙋 K</button>
+        <button class="arc-f" id="af-y"   onclick="arcFilter('Y',this)">👤 Y</button>
+        <button class="arc-f" id="af-ship" onclick="arcFilter('ship',this)">📦 発送管理</button>
+      </div>
+      <div id="arc-list"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 仕入れモーダル -->
+<div id="shiire-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;" onclick="closeShiire()"></div>
+<div id="shiire-modal" style="display:none;position:fixed;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:24px 20px 40px;z-index:501;box-shadow:0 -4px 24px rgba(0,0,0,0.12);">
+  <div style="width:36px;height:4px;background:#e0e0e0;border-radius:2px;margin:0 auto 20px;"></div>
+  <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:16px;letter-spacing:-0.02em;">🛒 仕入れ登録</div>
+  <div style="margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px;">商品名</div>
+    <input id="shiire-name" class="sinput" placeholder="例：シルバニア ラテネコファミリー" style="width:100%;"/>
+  </div>
+  <div style="margin-bottom:20px;">
+    <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px;">JAN コード（任意）</div>
+    <input id="shiire-jan" class="sinput" type="tel" placeholder="例：4904810123456" style="width:100%;"/>
+  </div>
+  <button onclick="addShiire()" style="width:100%;padding:14px;background:var(--req);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">K・Y の「計画する」に追加</button>
+</div>
+
+<!-- 発送モーダル -->
+<div id="hasso-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;" onclick="closeHasso()"></div>
+<div id="hasso-modal" style="display:none;position:fixed;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:24px 20px 40px;z-index:501;box-shadow:0 -4px 24px rgba(0,0,0,0.12);">
+  <div style="width:36px;height:4px;background:#e0e0e0;border-radius:2px;margin:0 auto 20px;"></div>
+  <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:16px;letter-spacing:-0.02em;">📦 受注登録</div>
+  <div style="margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px;">注文番号</div>
+    <input id="hasso-id" class="sinput" placeholder="例：12-34567-89012" style="width:100%;"/>
+  </div>
+  <div style="margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px;">商品名</div>
+    <input id="hasso-item" class="sinput" placeholder="例：シルバニア ラテネコファミリー" style="width:100%;"/>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px;">バイヤー名</div>
+      <input id="hasso-buyer" class="sinput" placeholder="例：john_smith"/>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px;">金額 $</div>
+      <input id="hasso-amt" class="sinput" type="number" placeholder="例：29.99"/>
+    </div>
+  </div>
+  <div style="margin-bottom:16px;">
+    <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:4px;">メモ</div>
+    <input id="hasso-note" class="sinput" placeholder="仕入れ先など" style="width:100%;"/>
+  </div>
+  <div style="font-size:11px;color:var(--sub);margin-bottom:16px;">📅 日付は自動で記録されます</div>
+  <button onclick="addHasso()" style="width:100%;padding:14px;background:var(--ship);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">📥 受注登録</button>
+</div>
+
+<!-- ステップ依頼モーダル -->
+<div id="sreq-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;" onclick="closeSReq()"></div>
+<div id="sreq-modal" style="display:none;position:fixed;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:24px 20px 40px;z-index:501;box-shadow:0 -4px 24px rgba(0,0,0,0.12);">
+  <div style="width:36px;height:4px;background:#e0e0e0;border-radius:2px;margin:0 auto 20px;"></div>
+  <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:4px;letter-spacing:-0.02em;">🔁 ステップを依頼</div>
+  <div id="sreq-item-name" style="font-size:12px;color:var(--sub);margin-bottom:16px;"></div>
+  <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px;">どのステップ？</div>
+  <div id="sreq-steps" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;"></div>
+  <div style="font-size:11px;font-weight:700;color:var(--sub);margin-bottom:8px;">誰に依頼？</div>
+  <div style="display:flex;gap:10px;margin-bottom:20px;">
+    <button id="sreq-k" onclick="selectSReqWho('K')" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--border);background:white;font-size:15px;font-weight:800;color:var(--k);cursor:pointer;font-family:inherit;">🙋 K</button>
+    <button id="sreq-y" onclick="selectSReqWho('Y')" style="flex:1;padding:12px;border-radius:12px;border:2px solid var(--border);background:white;font-size:15px;font-weight:800;color:var(--y);cursor:pointer;font-family:inherit;">👤 Y</button>
+  </div>
+  <button onclick="submitSReq()" style="width:100%;padding:14px;background:var(--req);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">依頼する</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const bulkSel = {K:{},Y:{}};
+let CW_TOKEN='';
+const CW_ROOM_ORDER='423443544';
+const CW_ROOM_SHIIRE='423443517';
+const STEPS = ['Thanksメッセージ','商品確保','梱包','出荷手続き','出荷','完了メッセージ'];
+const QM = {
+  q1:{l:'今すぐやる',c:'var(--q1)',bg:'var(--q1bg)',bd:'var(--q1bd)'},
+  q2:{l:'計画する',  c:'var(--q2)',bg:'var(--q2bg)',bd:'var(--q2bd)'},
+  q3:{l:'任せる',    c:'var(--q3)',bg:'var(--q3bg)',bd:'var(--q3bd)'},
+  q4:{l:'やめる',    c:'var(--q4)',bg:'var(--q4bg)',bd:'var(--q4bd)'},
+};
+
+
+let orderWho = '';
+function setOrderWho(v) {
+  orderWho = v;
+  ['k','y','b'].forEach(x => document.getElementById('owho-'+x).classList.remove('sel'));
+  const map = {K:'k',Y:'y',KY:'b'};
+  if(map[v]) document.getElementById('owho-'+map[v]).classList.add('sel');
+}
+
+let API='', ME='', S={tasks:[],reqs:[],orders:[]}, DNopen={K:false,Y:false};
+
+// ── INIT ──
+window.onload=()=>{
+  API=localStorage.getItem('ky_api')||'';
+  ME =localStorage.getItem('ky_me') ||'';
+  CW_TOKEN=localStorage.getItem('ky_cw_token')||'';
+  if(API&&ME) boot();
+};
+
+function selUser(u){ ME=u; document.getElementById('btn-k').className='ubtn k'+(u==='K'?' sel':''); document.getElementById('btn-y').className='ubtn y'+(u==='Y'?' sel':''); }
+
+function saveSetup(){
+  const url=document.getElementById('url-in').value.trim();
+  if(!url){alert('URLを入力してください');return;}
+  if(!ME){alert('KかYを選んでください');return;}
+  const cwToken=document.getElementById('cw-token-in').value.trim();
+  localStorage.setItem('ky_api',url); localStorage.setItem('ky_me',ME);
+  if(cwToken) localStorage.setItem('ky_cw_token',cwToken);
+  API=url; boot();
+}
+
+function boot(){
+  document.getElementById('setup').style.display='none';
+  document.getElementById('app').style.display='block';
+  const b=document.getElementById('badge');
+  b.textContent=ME==='K'?'🙋 K':'👤 Y';
+  b.style.background=ME==='K'?'var(--k)':'var(--y)';
+  loadAll();
+  // 60秒ごとにバックグラウンド自動更新
+  setInterval(()=>loadAll(true), 60000);
+}
+
+function switchUser(){
+  if(confirm('ユーザーを切り替えますか？')){localStorage.clear();location.reload();}
+}
+
+// ── API ──
+async function get(action){ const r=await fetch(`${API}?action=${action}`,{redirect:'follow'}); const j=await r.json(); if(!j.ok) throw new Error(j.error); return j.data; }
+async function post(body){
+  // Content-Typeを指定しない → text/plainとして送信 → CORSプリフライト回避
+  const r=await fetch(API,{method:'POST',body:JSON.stringify(body),redirect:'follow'});
+  const text=await r.text();
+  const j=JSON.parse(text);
+  if(!j.ok) throw new Error(j.error);
+  return j;
+}
+
+async function loadAll(silent=false){
+  try{
+    const [tasks,reqs,orders]=await Promise.all([get('getTasks'),get('getRequests'),get('getOrders')]);
+    S={tasks,reqs,orders}; renderAll();
+    if(!silent) toast('更新しました');
+  }catch(e){ toast('エラー: '+e.message,1); }
+}
+
+// バックグラウンドでGASに保存（画面はすでに更新済み）
+function syncBg(body){ post(body).catch(e=>toast('同期エラー: '+e.message,1)); }
+
+// ── RENDER ──
+function renderAll(){ renderMx('K'); renderMx('Y'); renderOrders(); renderArchive(); }
+
+function renderMx(sec){
+  const other = sec==='K'?'Y':'K';
+  const act=S.tasks.filter(t=>t.section===sec&&t.status==='active');
+  const dn =S.tasks.filter(t=>t.section===sec&&t.status==='done');
+  // 依頼: もらった(→q1) / 出した(→q3)
+  const reqIn  = S.reqs.filter(r=>r.to_user===sec  &&r.status==='pending');
+  const reqOut = S.reqs.filter(r=>r.from_user===sec&&r.status==='pending');
+  const lc=sec.toLowerCase();
+  const mxEl=document.getElementById(lc+'-mx');
+  const dnEl=document.getElementById(lc+'-dn');
+
+  mxEl.innerHTML=`
+    <div class="ax-row">
+      <div class="ax-col" style="color:var(--q1)">🔥 緊急</div>
+      <div class="ax-col" style="color:var(--q2)">📅 計画</div>
+    </div>
+    <div class="gw">
+      <div class="ax-side">
+        <div class="ax-lbl" style="color:${sec==='K'?'var(--k)':'var(--y)'}">${sec==='K'?'🙋':'👤'} ${sec}</div>
+        <div class="ax-lbl" style="color:${sec==='K'?'var(--y)':'var(--k)'}">${sec==='K'?'👤':'🙋'} ${other}</div>
+      </div>
+      <div class="grid" id="${sec}-g"></div>
+    </div>`;
+
+  const g=document.getElementById(sec+'-g');
+  ['q1','q2','q3','q4'].forEach(q=>{
+    const qt=act.filter(t=>t.quadrant===q);
+    const m=QM[q];
+    // q1: 受けた依頼を追加, q3: 出した依頼を追加
+    const extraReqs = q==='q1' ? reqIn : q==='q3' ? reqOut : [];
+    const totalCnt = qt.length + extraReqs.length;
+    g.innerHTML+=`
+      <div class="qc" style="background:${m.bg};border:1.5px solid ${m.bd}">
+        <div class="qc-hdr">
+          <span class="qc-lbl" style="color:${m.c}">${m.l}</span>
+          <div style="display:flex;gap:4px;align-items:center">
+            ${Object.keys(bulkSel[sec]||{}).length?`<button onclick="bulkDone('${sec}')" style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;border:none;background:${m.c};color:white;cursor:pointer;font-family:inherit;">✓ まとめて完了</button>`:''}
+            ${totalCnt?`<span class="qc-cnt">${totalCnt}件</span>`:''}
+          </div>
+        </div>
+        ${qt.map(t=>{
+          const sel=bulkSel[sec]&&bulkSel[sec][t.id];
+          return `
+          <div class="ti">
+            <div class="chk" style="border-color:${m.bd};${sel?'background:'+m.c+';border-color:'+m.c:''}" onclick="toggleBulk('${t.id}','${sec}','${q}')">
+              ${sel?'<span style=\'color:white;font-size:10px;font-weight:900;line-height:1;\'>✓</span>':''}
+            </div>
+            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}')">${esc(t.text)}</span>
+            <span class="xb" onclick="delTask('${t.id}')">×</span>
+          </div>`;
+        }).join('')}
+        ${extraReqs.map(r=>{
+          const fromC = r.from_user==='K'?'var(--k)':'var(--y)';
+          const label = q==='q1'
+            ? `<span style="font-size:9px;font-weight:600;color:${fromC};margin-right:3px;">🔁${r.from_user}→</span>`
+            : `<span style="font-size:9px;font-weight:600;color:var(--req);margin-right:3px;">🔁→${r.to_user}</span>`;
+          return `
+          <div class="ti" style="opacity:0.85;">
+            <div class="chk" style="border-color:var(--req);background:transparent;" onclick="doneReq('${r.id}')"></div>
+            <span class="tt" style="color:#555;">${label}${esc(r.text)}</span>
+          </div>`;
+        }).join('')}
+        <div class="ar">
+          <input class="ai" id="i-${sec}-${q}" placeholder="追加..." style="border-bottom-color:${m.bd}"
+            onkeydown="if(event.key==='Enter')addTask('${sec}','${q}')"/>
+          <button class="ab" style="color:${m.c}" onclick="addTask('${sec}','${q}')">+</button>
+        </div>
+      </div>`;
+  });
+
+  const isOpen=DNopen[sec];
+  dnEl.innerHTML=dn.length===0?'': `
+    <div class="done-sec">
+      <div class="done-hdr" onclick="toggleDn('${sec}')">
+        <span class="done-t">✅ 完了 (${dn.length}件)</span>
+        <span class="done-cv ${isOpen?'op':''}" id="dcv-${sec}">▼</span>
+      </div>
+      ${isOpen?`<div class="done-bd">${dn.map(t=>`
+        <div class="done-i">
+          <span class="done-tag" style="background:${QM[t.quadrant]?.c||'#aaa'}22;color:${QM[t.quadrant]?.c||'#aaa'}">${QM[t.quadrant]?.l||'?'}</span>
+          <span class="done-tt">${esc(t.text)}</span>
+          <span class="rb" onclick="restoreTask('${t.id}')">↩</span>
+          <span class="xb" onclick="delTask('${t.id}')">×</span>
+        </div>`).join('')}</div>`:''}
+    </div>`;
+}
+
+function renderReqs(){
+  const kty=S.reqs.filter(r=>r.from_user==='K'&&r.to_user==='Y'&&r.status!=='done');
+  const ytk=S.reqs.filter(r=>r.from_user==='Y'&&r.to_user==='K'&&r.status!=='done');
+  document.getElementById('kty-n').textContent=kty.length?kty.length+'件':'';
+  document.getElementById('ytk-n').textContent=ytk.length?ytk.length+'件':'';
+  const ri=r=>`<div class="ri"><span class="rt">${esc(r.text)}</span><div class="rchk" onclick="doneReq('${r.id}')">✓</div><span class="xb" onclick="delReq('${r.id}')">×</span></div>`;
+  document.getElementById('kty-list').innerHTML=kty.length?kty.map(ri).join(''):`<div class="empty">なし</div>`;
+  document.getElementById('ytk-list').innerHTML=ytk.length?ytk.map(ri).join(''):`<div class="empty">なし</div>`;
+}
+
+function renderOrders(){
+  const el=document.getElementById('orders');
+  const active=S.orders.filter(o=>parseInt(o.step)<6).reverse();
+  if(!active.length){ el.innerHTML=`<div style="text-align:center;padding:30px;color:#ccc;font-size:13px">受注なし</div>`; return; }
+  el.innerHTML=active.map(o=>{
+    const step=parseInt(o.step)||1;
+    return `<div class="oc">
+      <div class="oc-hdr">
+        <div>
+          <div class="oc-id">${esc(o.order_id)}${o.amount_usd?' · $'+o.amount_usd:''}</div>
+          <div class="oc-name">${esc(o.item_name)}</div>
+          <div class="oc-buyer">👤 ${esc(o.buyer)}</div>
+          ${o.assignee||o.source ? `<div style="font-size:10px;color:var(--sub);margin-top:2px;display:flex;gap:8px;">` + (o.assignee?`<span>🙋 ${esc(o.assignee)}</span>`:'') + (o.source?`<span>🏪 ${esc(o.source)}</span>`:'') + `</div>` : ''}
+        </div>
+        <span class="oc-del" onclick="delOrder('${o.order_id}')">×</span>
+      </div>
+      <div class="steps">
+        ${STEPS.map((s,i)=>{
+          const sn=i+1;
+          const cls=sn<step?'done':sn===step?'cur':'';
+          return `${i?'<span class="sarr">›</span>':''}<div class="step ${cls}" onclick="updStep('${o.order_id}',${sn})">${s}</div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:8px;text-align:right;">
+        <button onclick="openSReq('${o.order_id}','${esc(o.item_name)}')" style="font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;border:1.5px solid var(--req);background:transparent;color:var(--req);cursor:pointer;font-family:inherit;">🔁 ステップを依頼</button>
+      </div>
+      ${o.notes?`<div style="font-size:11px;color:#999;margin-top:6px">📝 ${esc(o.notes)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── ACTIONS ──
+async function addTask(sec,q){
+  const inp=document.getElementById(`i-${sec}-${q}`);
+  const txt=inp.value.trim(); if(!txt)return; inp.value='';
+  const other=sec==='K'?'Y':'K';
+  const now=new Date().toISOString();
+  const id1='tmp_'+Date.now();
+  // ローカル即時追加
+  S.tasks.push({id:id1,section:sec,text:txt,quadrant:q,status:'active',created_at:now});
+  if(q==='q3'){
+    const id2='tmp_'+(Date.now()+1);
+    S.tasks.push({id:id2,section:other,text:txt,quadrant:'q1',status:'active',created_at:now});
+  }
+  renderAll();
+  // バックグラウンド同期してIDを正式なものに更新
+  if(q==='q3'){
+    Promise.all([
+      post({action:'addTask',section:sec,text:txt,quadrant:'q3'}),
+      post({action:'addTask',section:other,text:txt,quadrant:'q1'})
+    ]).then(()=>loadAll(true)).catch(e=>toast('同期エラー: '+e.message,1));
+  } else {
+    post({action:'addTask',section:sec,text:txt,quadrant:q})
+      .then(()=>loadAll(true)).catch(e=>toast('同期エラー: '+e.message,1));
+  }
+}
+function toggleBulk(id,sec,q){
+  if(!bulkSel[sec]) bulkSel[sec]={};
+  if(bulkSel[sec][id]) delete bulkSel[sec][id];
+  else bulkSel[sec][id]=q;
+  renderMx(sec);
+}
+async function bulkDone(sec){
+  const checked = Object.keys(bulkSel[sec]||{});
+  if(!checked.length) return;
+  const now=new Date().toISOString();
+  checked.forEach(id=>{
+    const t=S.tasks.find(t=>t.id===id);
+    if(t){ t.status='done'; t._doneAt=now; }
+  });
+  DNopen[sec]=true; bulkSel[sec]={};
+  renderAll(); toast(checked.length+'件を完了しました！');
+  // バックグラウンド同期
+  checked.forEach(id=>syncBg({action:'updateTask',id,status:'done'}));
+}
+async function doneTask(id,sec){
+  // ローカル即時更新
+  const t=S.tasks.find(t=>t.id===id); if(t){ t.status='done'; t._doneAt=new Date().toISOString(); }
+  DNopen[sec]=true; renderMx(sec);
+  // バックグラウンド同期
+  syncBg({action:'updateTask',id,status:'done'});
+}
+async function restoreTask(id){
+  const t=S.tasks.find(t=>t.id===id); if(t) t.status='active';
+  renderAll();
+  syncBg({action:'updateTask',id,status:'active'});
+}
+async function delTask(id){
+  if(!confirm('削除しますか？'))return;
+  S.tasks=S.tasks.filter(t=>t.id!==id);
+  renderAll();
+  syncBg({action:'deleteTask',id});
+}
+async function addReq(from,to){
+  const key=from.toLowerCase()+'t'+to.toLowerCase();
+  const inp=document.getElementById(key+'-in');
+  const txt=inp.value.trim(); if(!txt)return; inp.value='';
+  try{ await post({action:'addRequest',from_user:from,to_user:to,text:txt}); await loadAll(); toast('依頼を送りました！'); }catch(e){ toast('エラー',1); }
+}
+async function doneReq(id){
+  const r=S.reqs.find(r=>r.id===id); if(r) r.status='done';
+  renderAll(); toast('完了！');
+  syncBg({action:'updateRequest',id,status:'done'});
+}
+async function delReq(id){
+  if(!confirm('削除しますか？'))return;
+  S.reqs=S.reqs.filter(r=>r.id!==id);
+  renderAll();
+  syncBg({action:'deleteRequest',id});
+}
+async function addOrder(){
+  const id=document.getElementById('oi-id').value.trim();
+  const buyer=document.getElementById('oi-buyer').value.trim();
+  const item=document.getElementById('oi-item').value.trim();
+  const amt=document.getElementById('oi-amt').value.trim();
+  const note=document.getElementById('oi-note').value.trim();
+  if(!id||!buyer||!item){alert('注文番号・商品名・バイヤー名は必須');return;}
+  try{
+    await post({action:'addOrder',order_id:id,item_name:item,buyer,amount_usd:amt,notes:note});
+    ['oi-id','oi-buyer','oi-item','oi-amt','oi-note'].forEach(i=>document.getElementById(i).value=''); orderWho=''; ['k','y','b'].forEach(x=>document.getElementById('owho-'+x).classList.remove('sel'));
+    await loadAll(); toast('受注登録しました！');
+  }catch(e){ toast('エラー',1); }
+}
+async function updStep(oid,step){
+  const o=S.orders.find(o=>o.order_id===oid); if(o) o.step=step;
+  renderOrders(); toast(STEPS[step-1]+' ✓');
+  syncBg({action:'updateOrderStep',order_id:oid,step});
+  // Chatwork通知
+  const cwt=localStorage.getItem('ky_cw_token')||'';
+  if(cwt&&o){
+    const msg=`[info][title]📦 発送進捗[/title]${ME}が (${o.order_id} / ${o.item_name}) の「${STEPS[step-1]}」を完了しました[/info]`;
+    post({action:'sendChatwork',token:cwt,room:CW_ROOM_ORDER,message:msg}).catch(e=>console.error('CW error:',e));
+  }
+}
+async function delOrder(oid){
+  if(!confirm('受注を削除しますか？'))return;
+  S.orders=S.orders.filter(o=>o.order_id!==oid);
+  renderOrders();
+  syncBg({action:'deleteOrder',order_id:oid});
+}
+
+// ── UI ──
+function showTab(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('act'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act'));
+  document.getElementById(id).classList.add('act');
+  el.classList.add('act');
+}
+function toggleDn(sec){ DNopen[sec]=!DNopen[sec]; renderMx(sec); }
+
+// ── 仕入れモーダル ──
+
+// ── ステップ依頼モーダル ──
+let sReqOrderId="", sReqItemName="", sReqStep="", sReqWho="";
+
+function openSReq(oid, iname){
+  sReqOrderId=oid; sReqItemName=iname; sReqStep=""; sReqWho="";
+  document.getElementById("sreq-item-name").textContent=iname;
+  const stepsEl=document.getElementById("sreq-steps");
+  stepsEl.innerHTML=STEPS.map((s,i)=>{
+    const sn=String(i+1);
+    return `<button id="sreqst-${sn}" onclick="selectSReqStep('${sn}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid #e0e0e0;background:white;font-size:11px;font-weight:700;color:#888;cursor:pointer;font-family:inherit;">${s}</button>`;
+  }).join("");
+  ["k","y"].forEach(x=>{ const b=document.getElementById("sreq-"+x); b.style.background="white"; b.style.borderColor="var(--border)"; });
+  document.getElementById("sreq-overlay").style.display="block";
+  document.getElementById("sreq-modal").style.display="block";
+}
+
+function closeSReq(){
+  document.getElementById("sreq-overlay").style.display="none";
+  document.getElementById("sreq-modal").style.display="none";
+}
+
+function selectSReqStep(sn){
+  sReqStep=sn;
+  STEPS.forEach((_,i)=>{
+    const b=document.getElementById("sreqst-"+(i+1));
+    if(b){ b.style.background=String(i+1)===sn?"var(--req)":"white"; b.style.color=String(i+1)===sn?"white":"#888"; b.style.borderColor=String(i+1)===sn?"var(--req)":"#e0e0e0"; }
+  });
+}
+
+function selectSReqWho(who){
+  sReqWho=who;
+  const kb=document.getElementById("sreq-k"); const yb=document.getElementById("sreq-y");
+  kb.style.background=who==="K"?"var(--k)":"white"; kb.style.color=who==="K"?"white":"var(--k)"; kb.style.borderColor=who==="K"?"var(--k)":"var(--border)";
+  yb.style.background=who==="Y"?"var(--y)":"white"; yb.style.color=who==="Y"?"white":"var(--y)"; yb.style.borderColor=who==="Y"?"var(--y)":"var(--border)";
+}
+
+async function submitSReq(){
+  if(!sReqStep){alert("ステップを選んでください");return;}
+  if(!sReqWho){alert("依頼する人を選んでください");return;}
+  const stepName=STEPS[parseInt(sReqStep)-1];
+  const from=ME; const to=sReqWho;
+  if(from===to){alert("自分には依頼できません");return;}
+  const txt="📦 "+sReqItemName+" | "+stepName;
+  try{
+    await post({action:"addRequest",from_user:from,to_user:to,text:txt});
+    closeSReq(); await loadAll(); toast(to+"さんに依頼しました！");
+  }catch(e){ toast("エラー: "+e.message,1); }
+}
+
+// ── 発送モーダル ──
+function toggleHasso(){
+  const ov=document.getElementById("hasso-overlay");
+  const md=document.getElementById("hasso-modal");
+  const isOpen=md.style.display!=="none";
+  ov.style.display=isOpen?"none":"block";
+  md.style.display=isOpen?"none":"block";
+  if(!isOpen) setTimeout(()=>document.getElementById("hasso-id").focus(),100);
+}
+function closeHasso(){
+  document.getElementById("hasso-overlay").style.display="none";
+  document.getElementById("hasso-modal").style.display="none";
+}
+async function addHasso(){
+  const item=document.getElementById("hasso-item").value.trim();
+  const id=document.getElementById("hasso-id").value.trim();
+  const buyer=document.getElementById("hasso-buyer").value.trim();
+  const amt=document.getElementById("hasso-amt").value.trim();
+  const note=document.getElementById("hasso-note").value.trim();
+  if(!item||!id||!buyer){alert("商品名・注文番号・バイヤー名は必須");return;}
+  try{
+    await post({action:"addOrder",order_id:id,item_name:item,buyer:buyer,amount_usd:amt,notes:note});
+    ["hasso-item","hasso-id","hasso-buyer","hasso-amt","hasso-note"].forEach(x=>document.getElementById(x).value="");
+    closeHasso(); await loadAll(); toast("受注登録しました！");
+    // Chatwork通知
+    const cwt=localStorage.getItem('ky_cw_token')||'';
+    if(cwt){
+      const amtStr=amt?` $${amt}`:'';
+      const msg=`[info][title]📦 新規受注[/title]${ME}が受注登録しました
+注文番号：${id}
+商品：${item}
+バイヤー：${buyer}${amtStr}[/info]`;
+      post({action:'sendChatwork',token:cwt,room:CW_ROOM_ORDER,message:msg}).catch(e=>console.error('CW error:',e));
+    }
+  }catch(e){ toast("エラー: "+e.message,1); }
+}
+function toggleShiire(){
+  const ov=document.getElementById("shiire-overlay");
+  const md=document.getElementById("shiire-modal");
+  const isOpen=md.style.display!=="none";
+  ov.style.display=isOpen?"none":"block";
+  md.style.display=isOpen?"none":"block";
+  if(!isOpen) setTimeout(()=>document.getElementById("shiire-name").focus(),100);
+}
+function closeShiire(){
+  document.getElementById("shiire-overlay").style.display="none";
+  document.getElementById("shiire-modal").style.display="none";
+}
+async function addShiire(){
+  const name=document.getElementById("shiire-name").value.trim();
+  const jan=document.getElementById("shiire-jan").value.trim();
+  if(!name){alert("商品名を入力してください");return;}
+  const txt=jan?"[JAN:"+jan+"] "+name:name;
+  try{
+    await Promise.all([
+      post({action:"addTask",section:"K",text:txt,quadrant:"q2"}),
+      post({action:"addTask",section:"Y",text:txt,quadrant:"q2"})
+    ]);
+    document.getElementById("shiire-name").value="";
+    document.getElementById("shiire-jan").value="";
+    closeShiire();
+    await loadAll();
+    toast("K・Yの計画するに追加しました！");
+    // Chatwork通知
+    const cwt=localStorage.getItem('ky_cw_token')||'';
+    if(cwt){
+      const msg=`[info][title]🛒 仕入れ登録[/title]${ME}が「${txt}」を仕入れ登録しました。K・Yの計画するに追加済み[/info]`;
+      post({action:'sendChatwork',token:cwt,room:CW_ROOM_SHIIRE,message:msg}).catch(e=>console.error('CW error:',e));
+    }
+  }catch(e){ toast("エラー: "+e.message,1); }
+}
+function toast(msg,err=0){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.style.background=err?'#e53935':'#333';
+  el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2200);
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── ARCHIVE ──
+let arcMode = 'all';
+
+function renderArchive() {
+  const el = document.getElementById('arc-list');
+  if (!el) return;
+
+  const doneTasks = S.tasks.filter(t => t.status === 'done');
+  const doneReqs  = S.reqs.filter(r => r.status === 'done');
+  const doneOrders = S.orders.filter(o => parseInt(o.step) >= 6);
+
+  let items = [];
+
+  if (arcMode === 'all' || arcMode === 'K')
+    doneTasks.filter(t => t.section === 'K').forEach(t => items.push({type:'task', sec:'K', data:t}));
+  if (arcMode === 'all' || arcMode === 'Y')
+    doneTasks.filter(t => t.section === 'Y').forEach(t => items.push({type:'task', sec:'Y', data:t}));
+  if (arcMode === 'all' || arcMode === 'req')
+    doneReqs.forEach(r => items.push({type:'req', data:r}));
+  if (arcMode === 'all' || arcMode === 'ship')
+    doneOrders.forEach(o => items.push({type:'order', data:o}));
+
+  // 日付降順
+  items.sort((a,b) => {
+    const da = a.data.done_at || a.data.created_at || '';
+    const db = b.data.done_at || b.data.created_at || '';
+    return db.localeCompare(da);
+  });
+
+  if (!items.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#ccc;font-size:13px">完了記録なし</div>';
+    return;
+  }
+
+  el.innerHTML = items.map(item => {
+    if (item.type === 'task') {
+      const q = QM[item.data.quadrant] || {l:'?',c:'#aaa'};
+      const sColor = item.sec === 'K' ? 'var(--k)' : 'var(--y)';
+      const sLabel = item.sec === 'K' ? '🙋 K' : '👤 Y';
+      return `<div class="arc-card">
+        <div class="arc-icon">✅</div>
+        <div class="arc-body">
+          <div class="arc-txt">${esc(item.data.text)}</div>
+          <div class="arc-meta">
+            <span class="arc-tag" style="background:${sColor}22;color:${sColor}">${sLabel}</span>
+            <span class="arc-tag" style="background:${q.c}22;color:${q.c}">${q.l}</span>
+            ${item.data.done_at ? '<span>📅 '+item.data.done_at+'</span>' : ''}
+          </div>
+        </div>
+        <span class="arc-restore" title="元に戻す" onclick="restoreTask('${item.data.id}')">↩</span>
+      </div>`;
+    }
+    if (item.type === 'req') {
+      const fc = item.data.from_user==='K'?'var(--k)':'var(--y)';
+      const tc = item.data.to_user==='K'?'var(--k)':'var(--y)';
+      return `<div class="arc-card">
+        <div class="arc-icon">🔁</div>
+        <div class="arc-body">
+          <div class="arc-txt">${esc(item.data.text)}</div>
+          <div class="arc-meta">
+            <span class="arc-tag" style="background:${fc}22;color:${fc}">${item.data.from_user}</span>
+            <span style="color:#ccc">→</span>
+            <span class="arc-tag" style="background:${tc}22;color:${tc}">${item.data.to_user}</span>
+            ${item.data.done_at ? '<span>📅 '+item.data.done_at+'</span>' : ''}
+          </div>
+        </div>
+        <span class="arc-restore" title="削除" onclick="delReq('${item.data.id}')">×</span>
+      </div>`;
+    }
+    if (item.type === 'order') {
+      return `<div class="arc-card">
+        <div class="arc-icon">📦</div>
+        <div class="arc-body">
+          <div class="arc-txt">${esc(item.data.item_name)}</div>
+          <div class="arc-meta">
+            <span class="arc-tag" style="background:#43a04722;color:#43a047">発送完了</span>
+            <span>👤 ${esc(item.data.buyer)}</span>
+            ${item.data.amount_usd ? '<span>$'+item.data.amount_usd+'</span>' : ''}
+            <span>${esc(item.data.order_id)}</span>
+          </div>
+        </div>
+      </div>`;
+    }
+    return '';
+  }).join('');
+}
+
+function arcFilter(mode, el) {
+  arcMode = mode;
+  document.querySelectorAll('.arc-f').forEach(b => b.classList.remove('act'));
+  el.classList.add('act');
+  renderArchive();
+}
+
+</script>
+</body>
+</html>
