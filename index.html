@@ -515,38 +515,32 @@ function toggleBulk(id,sec,q){
 async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
   if(!checked.length){ toast('選択なし',1); return; }
-  toast('処理中... '+checked.length+'件');
   const now=new Date().toISOString();
-  const texts=[];
+  const toUpdate=[]; // GASに送るID一覧
   checked.forEach(id=>{
     const t=S.tasks.find(t=>String(t.id)===String(id));
     if(t){
+      // ローカルでK・Y両方のテキスト一致を全部完了
       S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
-        .forEach(x=>{ x.status='done'; x._doneAt=now; });
-      if(!texts.includes(t.text)) texts.push(t.text);
+        .forEach(x=>{
+          x.status='done'; x._doneAt=now;
+          if(!toUpdate.find(u=>String(u)===String(x.id))) toUpdate.push(x.id);
+        });
     }
   });
   DNopen[sec]=true; bulkSel[sec]={};
-  renderAll();
-  // GASに送信して結果確認
-  for(const text of texts){
-    try{
-      const r=await post({action:'doneTaskByText',text});
-      toast('GAS完了: '+r.count+'件更新');
-    }catch(e){
-      toast('GASエラー: '+e.message,1);
-    }
-  }
+  renderAll(); toast(checked.length+'件を完了しました！');
+  // GASに個別で保存（再デプロイ不要）
+  toUpdate.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>toast('同期エラー',1)));
 }
 async function doneTask(id,sec){
-  const t=S.tasks.find(t=>t.id===id); if(!t) return;
+  const t=S.tasks.find(t=>String(t.id)===String(id)); if(!t) return;
   const now=new Date().toISOString();
-  // ローカルで同テキストのタスクを全部完了
+  const toUpdate=[];
   S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
-    .forEach(x=>{ x.status='done'; x._doneAt=now; });
+    .forEach(x=>{ x.status='done'; x._doneAt=now; toUpdate.push(x.id); });
   DNopen[sec]=true; renderAll();
-  // GASにテキスト一致で一括完了（IDに依存しない）
-  post({action:'doneTaskByText',text:t.text}).catch(e=>toast('同期エラー: '+e.message,1));
+  toUpdate.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>toast('同期エラー',1)));
 }
 async function restoreTask(id){
   const t=S.tasks.find(t=>t.id===id); if(t) t.status='active';
@@ -803,9 +797,9 @@ function renderArchive() {
 
   // 日付降順
   items.sort((a,b) => {
-    const da = a.data._doneAt || a.data.done_at || '';
-    const db = b.data._doneAt || b.data.done_at || '';
-    return db.localeCompare(da);
+    const da = (a.data._doneAt || a.data.done_at || '').slice(0,10);
+    const db = (b.data._doneAt || b.data.done_at || '').slice(0,10);
+    return db > da ? 1 : db < da ? -1 : 0;
   });
 
   if (!items.length) {
