@@ -195,6 +195,15 @@ body { background:var(--bg); font-family:'Noto Sans JP','Hiragino Sans',sans-ser
   </div>
 </div>
 
+<!-- 編集モーダル -->
+<div id="edit-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;" onclick="closeEdit()"></div>
+<div id="edit-modal" style="display:none;position:fixed;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:24px 20px 40px;z-index:501;box-shadow:0 -4px 24px rgba(0,0,0,0.12);">
+  <div style="width:36px;height:4px;background:#e0e0e0;border-radius:2px;margin:0 auto 20px;"></div>
+  <div style="font-size:16px;font-weight:900;color:var(--text);margin-bottom:16px;">✏️ タスクを編集</div>
+  <input id="edit-input" class="sinput" style="width:100%;margin-bottom:20px;" placeholder="タスク内容"/>
+  <button onclick="saveEdit()" style="width:100%;padding:14px;background:var(--k);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">保存</button>
+</div>
+
 <!-- 仕入れモーダル -->
 <div id="shiire-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:500;" onclick="closeShiire()"></div>
 <div id="shiire-modal" style="display:none;position:fixed;bottom:0;left:0;right:0;background:white;border-radius:20px 20px 0 0;padding:24px 20px 40px;z-index:501;box-shadow:0 -4px 24px rgba(0,0,0,0.12);">
@@ -388,10 +397,10 @@ function renderMx(sec){
           const sel=bulkSel[sec]&&bulkSel[sec][t.id];
           return `
           <div class="ti">
-            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][t.id]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}')">
-              ${bulkSel[sec]&&bulkSel[sec][t.id]?'<span style="color:white;font-size:12px;font-weight:900;line-height:1;">✓</span>':''}
+            <div class="chk" style="border-color:${m.bd};${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'background:'+m.c+';border-color:'+m.c+';':''}" onclick="toggleBulk('${t.id}','${sec}','${q}')">
+              ${bulkSel[sec]&&bulkSel[sec][String(t.id)]?'<span style="color:white;font-size:12px;font-weight:900;line-height:1;">✓</span>':''}
             </div>
-            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}')">${esc(t.text)}</span>
+            <span class="tt" onclick="toggleBulk('${t.id}','${sec}','${q}')" oncontextmenu="editTask(event,'${t.id}','${sec}');return false;" ontouchstart="startLongPress('${t.id}','${sec}')" ontouchend="clearLongPress()" ontouchmove="clearLongPress()">${esc(t.text)}</span>
             <span class="xb" onclick="delTask('${t.id}')">×</span>
           </div>`;
         }).join('')}
@@ -609,6 +618,41 @@ function showTab(id,el){
 }
 function toggleDn(sec){ DNopen[sec]=!DNopen[sec]; renderMx(sec); }
 
+
+// ── 編集モーダル ──
+let editTaskId='', editSec='', lpTimer=null;
+
+function startLongPress(id,sec){
+  lpTimer=setTimeout(()=>editTask(null,id,sec), 600);
+}
+function clearLongPress(){
+  if(lpTimer){ clearTimeout(lpTimer); lpTimer=null; }
+}
+function editTask(e,id,sec){
+  if(e) e.preventDefault();
+  const t=S.tasks.find(t=>String(t.id)===String(id)); if(!t) return;
+  editTaskId=id; editSec=sec;
+  document.getElementById('edit-input').value=t.text;
+  document.getElementById('edit-overlay').style.display='block';
+  document.getElementById('edit-modal').style.display='block';
+  setTimeout(()=>document.getElementById('edit-input').focus(),100);
+}
+function closeEdit(){
+  document.getElementById('edit-overlay').style.display='none';
+  document.getElementById('edit-modal').style.display='none';
+}
+async function saveEdit(){
+  const newText=document.getElementById('edit-input').value.trim();
+  if(!newText){alert('テキストを入力してください');return;}
+  const t=S.tasks.find(t=>String(t.id)===String(editTaskId)); if(!t) return;
+  const oldText=t.text;
+  // ローカルで同テキストのタスクを全部更新
+  S.tasks.filter(x=>x.text.trim()===oldText.trim())
+    .forEach(x=>{ x.text=newText; });
+  closeEdit(); renderAll(); toast('更新しました！');
+  // GASに保存
+  post({action:'updateTask',id:editTaskId,text:newText}).catch(e=>toast('同期エラー',1));
+}
 // ── 仕入れモーダル ──
 
 // ── ステップ依頼モーダル ──
@@ -761,7 +805,7 @@ function renderArchive() {
   items.sort((a,b) => {
     const da = a.data._doneAt || a.data.done_at || '';
     const db = b.data._doneAt || b.data.done_at || '';
-    return db.localeCompare(da);
+    return da.localeCompare(db);
   });
 
   if (!items.length) {
