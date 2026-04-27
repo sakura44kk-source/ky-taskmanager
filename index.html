@@ -428,10 +428,11 @@ function renderMx(sec){
   if(!fb){
     fb=document.createElement('button');
     fb.id='fb-'+sec;
-    fb.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:300;border:none;border-radius:28px;padding:14px 32px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,0.25);display:none;';
+    fb.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;border:none;border-radius:28px;padding:16px 36px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,0.3);display:none;pointer-events:all;touch-action:manipulation;';
     fb.style.background=sec==='K'?'var(--k)':'var(--y)';
     fb.style.color='white';
-    fb.onclick=()=>bulkDone(sec);
+    fb.onclick=(e)=>{ e.stopPropagation(); bulkDone(sec); };
+    fb.ontouchend=(e)=>{ e.preventDefault(); e.stopPropagation(); bulkDone(sec); };
     document.body.appendChild(fb);
   }
   if(bulkCnt>0){
