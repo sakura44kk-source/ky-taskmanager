@@ -514,16 +514,17 @@ function toggleBulk(id,sec,q){
 }
 async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
-  toast('checked:'+checked.length+' tasks:'+S.tasks.length);
   if(!checked.length){ toast('選択なし',1); return; }
   const now=new Date().toISOString();
   const doneIds=new Set();
   let foundCount=0;
+  const cid0=checked[0];
+  const id0type=typeof S.tasks[0]?.id;
+  const id0val=String(S.tasks[0]?.id).slice(0,8);
   checked.forEach(cid=>{
     S.tasks.forEach(x=>{
       if(String(x.id)===String(cid)){
         foundCount++;
-        toast('found:'+x.text.slice(0,10)+' st:'+x.status);
         S.tasks.forEach(y=>{
           if(y.text.trim()===x.text.trim()&&y.status==='active'){
             y.status='done'; y._doneAt=now;
@@ -533,7 +534,8 @@ async function bulkDone(sec){
       }
     });
   });
-  toast('done:'+doneIds.size+' found:'+foundCount);
+  // 1つのトーストに全情報
+  alert('cid:'+cid0.slice(0,8)+'\nidType:'+id0type+'\nid0:'+id0val+'\nfound:'+foundCount+'\ndone:'+doneIds.size);
   DNopen[sec]=true; bulkSel[sec]={};
   renderAll();
   doneIds.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>console.error(e)));
