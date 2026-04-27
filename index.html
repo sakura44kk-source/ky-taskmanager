@@ -267,6 +267,11 @@ body { background:var(--bg); font-family:'Noto Sans JP','Hiragino Sans',sans-ser
   <button onclick="submitSReq()" style="width:100%;padding:14px;background:var(--req);color:white;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">依頼する</button>
 </div>
 
+<!-- まとめて完了バー -->
+<div id="bulk-bar" style="display:none;position:fixed;bottom:90px;left:0;right:0;display:none;justify-content:center;z-index:9999;pointer-events:all;">
+  <button id="bulk-btn" style="background:#ff6b9d;color:white;border:none;border-radius:28px;padding:14px 36px;font-size:15px;font-weight:800;box-shadow:0 4px 20px rgba(0,0,0,0.25);font-family:inherit;cursor:pointer;" onclick="bulkDoneActive()">✓ まとめて完了</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -351,7 +356,7 @@ async function loadAll(silent=false){
 function syncBg(body){ post(body).catch(e=>toast('同期エラー: '+e.message,1)); }
 
 // ── RENDER ──
-function renderAll(){ renderMx('K'); renderMx('Y'); renderOrders(); renderArchive(); }
+function renderAll(){ renderMx('K'); renderMx('Y'); renderOrders(); renderArchive(); updateBulkBar(); }
 
 function renderMx(sec){
   const other = sec==='K'?'Y':'K';
@@ -421,26 +426,6 @@ function renderMx(sec){
         </div>
       </div>`;
   });
-
-  // 固定完了ボタン
-  const bulkCnt=Object.keys(bulkSel[sec]||{}).length;
-  let fb=document.getElementById('fb-'+sec);
-  if(!fb){
-    fb=document.createElement('button');
-    fb.id='fb-'+sec;
-    fb.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:9999;border:none;border-radius:28px;padding:16px 36px;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(0,0,0,0.3);display:none;pointer-events:all;touch-action:manipulation;';
-    fb.style.background=sec==='K'?'var(--k)':'var(--y)';
-    fb.style.color='white';
-    fb.onclick=(e)=>{ e.stopPropagation(); bulkDone(sec); };
-    fb.ontouchend=(e)=>{ e.preventDefault(); e.stopPropagation(); bulkDone(sec); };
-    document.body.appendChild(fb);
-  }
-  if(bulkCnt>0){
-    fb.textContent='✓ '+bulkCnt+'件を完了';
-    fb.style.display='block';
-  } else {
-    fb.style.display='none';
-  }
 
   const isOpen=DNopen[sec];
   dnEl.innerHTML=dn.length===0?'': `
@@ -536,6 +521,24 @@ function toggleBulk(id,sec,q){
     bulkSel[sec][key]={q, txt: t?t.text:''};
   }
   renderMx(sec);
+}
+function updateBulkBar(){
+  const kCnt=Object.keys(bulkSel['K']||{}).length;
+  const yCnt=Object.keys(bulkSel['Y']||{}).length;
+  const total=kCnt+yCnt;
+  const bar=document.getElementById('bulk-bar');
+  const btn=document.getElementById('bulk-btn');
+  if(!bar||!btn) return;
+  if(total>0){
+    btn.textContent='✓ '+total+'件を完了';
+    bar.style.display='flex';
+  } else {
+    bar.style.display='none';
+  }
+}
+function bulkDoneActive(){
+  const sec=Object.keys(bulkSel['K']||{}).length>0?'K':'Y';
+  bulkDone(sec);
 }
 async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
