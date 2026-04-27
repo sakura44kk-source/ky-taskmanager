@@ -505,24 +505,29 @@ function toggleBulk(id,sec,q){
 }
 async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
-  if(!checked.length) return;
+  if(!checked.length){ toast('選択なし',1); return; }
+  toast('処理中... '+checked.length+'件');
   const now=new Date().toISOString();
   const texts=[];
   checked.forEach(id=>{
     const t=S.tasks.find(t=>t.id===id);
     if(t){
-      // ローカルでK・Y両方のテキスト一致を全部完了
       S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
         .forEach(x=>{ x.status='done'; x._doneAt=now; });
       if(!texts.includes(t.text)) texts.push(t.text);
     }
   });
   DNopen[sec]=true; bulkSel[sec]={};
-  renderAll(); toast(checked.length+'件を完了しました！');
-  // GASにテキスト一致で一括完了
-  texts.forEach(text=>
-    post({action:'doneTaskByText',text}).catch(e=>toast('同期エラー: '+e.message,1))
-  );
+  renderAll();
+  // GASに送信して結果確認
+  for(const text of texts){
+    try{
+      const r=await post({action:'doneTaskByText',text});
+      toast('GAS完了: '+r.count+'件更新');
+    }catch(e){
+      toast('GASエラー: '+e.message,1);
+    }
+  }
 }
 async function doneTask(id,sec){
   const t=S.tasks.find(t=>t.id===id); if(!t) return;
@@ -754,8 +759,8 @@ function renderArchive() {
 
   // 日付降順
   items.sort((a,b) => {
-    const da = a.data._doneAt || a.data.done_at || a.data.created_at || '';
-    const db = b.data._doneAt || b.data.done_at || b.data.created_at || '';
+    const da = a.data._doneAt || a.data.done_at || '';
+    const db = b.data._doneAt || b.data.done_at || '';
     return db.localeCompare(da);
   });
 
