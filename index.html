@@ -514,14 +514,16 @@ function toggleBulk(id,sec,q){
 }
 async function bulkDone(sec){
   const checked=Object.keys(bulkSel[sec]||{});
+  toast('checked:'+checked.length+' tasks:'+S.tasks.length);
   if(!checked.length){ toast('選択なし',1); return; }
   const now=new Date().toISOString();
-  // 完了させるIDを全部収集（K・Y両方のtwin含む）
   const doneIds=new Set();
+  let foundCount=0;
   checked.forEach(cid=>{
     S.tasks.forEach(x=>{
-      if(String(x.id)===String(cid)) {
-        // このタスクと同テキストのものを全部完了
+      if(String(x.id)===String(cid)){
+        foundCount++;
+        toast('found:'+x.text.slice(0,10)+' st:'+x.status);
         S.tasks.forEach(y=>{
           if(y.text.trim()===x.text.trim()&&y.status==='active'){
             y.status='done'; y._doneAt=now;
@@ -531,9 +533,9 @@ async function bulkDone(sec){
       }
     });
   });
+  toast('done:'+doneIds.size+' found:'+foundCount);
   DNopen[sec]=true; bulkSel[sec]={};
   renderAll();
-  toast(checked.length+'件を完了しました！');
   doneIds.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>console.error(e)));
 }
 async function doneTask(id,sec){
