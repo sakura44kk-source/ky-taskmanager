@@ -423,6 +423,12 @@ function renderMx(sec){
             <span class="tt" style="color:#555;">${lbl} ${esc(r.text)}</span>
           </div>`;
         }).join('')}
+        ${q==='q4'?S.orders.filter(o=>parseInt(o.step)<6).map(o=>`
+          <div class="ti" onclick="goShip()" style="cursor:pointer;">
+            <span style="font-size:14px;flex-shrink:0;">📦</span>
+            <span class="tt" style="color:var(--ship);font-weight:600;">${esc(o.order_id)}<br><span style="font-size:10px;color:#999;">${esc(o.item_name)}</span></span>
+            <span style="font-size:10px;color:#bbb;">${STEPS[(parseInt(o.step)||1)-1]}</span>
+          </div>`).join(''):''}
         <div class="ar">
           <input class="ai" id="i-${sec}-${q}" placeholder="追加..." style="border-bottom-color:${m.bd}"
             onkeydown="if(event.key==='Enter')addTask('${sec}','${q}')"/>
@@ -794,6 +800,12 @@ async function addHasso(){
 バイヤー：${buyer}${amt?' $'+amt:''}[/info]`}).catch(()=>{});
     }
   }catch(e){toast('エラー: '+e.message,1);}
+}
+
+// ── 発送管理へジャンプ ──
+function goShip(){
+  const tab=document.querySelector('.tab[onclick*="pship"]');
+  showTab('pship', tab);
 }
 
 // ── トースト ──
