@@ -507,32 +507,28 @@ async function bulkDone(sec){
   const checked = Object.keys(bulkSel[sec]||{});
   if(!checked.length) return;
   const now=new Date().toISOString();
-  const other=sec==='K'?'Y':'K';
+  const texts=[];
   checked.forEach(id=>{
     const t=S.tasks.find(t=>t.id===id);
     if(t){
-      t.status='done'; t._doneAt=now;
-      // 相手の同テキストも完了
-      const twin=S.tasks.find(x=>x.section===other&&x.text===t.text&&x.status==='active');
-      if(twin){ twin.status='done'; twin._doneAt=now; syncBg({action:'updateTask',id:twin.id,status:'done'}); }
+      S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
+        .forEach(x=>{ x.status='done'; x._doneAt=now; });
+      texts.push(t.text);
     }
   });
   DNopen[sec]=true; bulkSel[sec]={};
   renderAll(); toast(checked.length+'件を完了しました！');
-  checked.forEach(id=>syncBg({action:'updateTask',id,status:'done'}));
+  texts.forEach(text=>post({action:'doneTaskByText',text}).catch(e=>toast('同期エラー: '+e.message,1)));
 }
 async function doneTask(id,sec){
   const t=S.tasks.find(t=>t.id===id); if(!t) return;
   const now=new Date().toISOString();
-  t.status='done'; t._doneAt=now;
-  const other=sec==='K'?'Y':'K';
-  const twin=S.tasks.find(x=>x.section===other&&x.text.trim()===t.text.trim()&&x.status==='active');
-  if(twin){ twin.status='done'; twin._doneAt=now; }
+  // ローカルで同テキストのタスクを全部完了
+  S.tasks.filter(x=>x.text.trim()===t.text.trim()&&x.status==='active')
+    .forEach(x=>{ x.status='done'; x._doneAt=now; });
   DNopen[sec]=true; renderAll();
-  // GASに両方確実に保存
-  const doneCalls=[post({action:'updateTask',id,status:'done'})];
-  if(twin) doneCalls.push(post({action:'updateTask',id:twin.id,status:'done'}));
-  Promise.all(doneCalls).catch(e=>toast('同期エラー: '+e.message,1));
+  // GASにテキスト一致で一括完了（IDに依存しない）
+  post({action:'doneTaskByText',text:t.text}).catch(e=>toast('同期エラー: '+e.message,1));
 }
 async function restoreTask(id){
   const t=S.tasks.find(t=>t.id===id); if(t) t.status='active';
