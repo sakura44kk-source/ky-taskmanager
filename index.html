@@ -389,7 +389,6 @@ function renderMx(sec){
         <div class="qc-hdr">
           <span class="qc-lbl" style="color:${m.c}">${m.l}</span>
           <div style="display:flex;gap:4px;align-items:center">
-            ${Object.keys(bulkSel[sec]||{}).length?`<button onclick="bulkDone('${sec}')" style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;border:none;background:${m.c};color:white;cursor:pointer;font-family:inherit;">✓ まとめて完了</button>`:''}
             ${totalCnt?`<span class="qc-cnt">${totalCnt}件</span>`:''}
           </div>
         </div>
@@ -518,9 +517,6 @@ async function bulkDone(sec){
   const now=new Date().toISOString();
   const doneIds=new Set();
   let foundCount=0;
-  const cid0=checked[0];
-  const id0type=typeof S.tasks[0]?.id;
-  const id0val=String(S.tasks[0]?.id).slice(0,8);
   checked.forEach(cid=>{
     S.tasks.forEach(x=>{
       if(String(x.id)===String(cid)){
@@ -535,7 +531,7 @@ async function bulkDone(sec){
     });
   });
   // 1つのトーストに全情報
-  alert('cid:'+cid0.slice(0,8)+'\nidType:'+id0type+'\nid0:'+id0val+'\nfound:'+foundCount+'\ndone:'+doneIds.size);
+  if(doneIds.size>0){ toast(doneIds.size+'件完了！'); } else { toast('タスクが見つかりません',1); }
   DNopen[sec]=true; bulkSel[sec]={};
   renderAll();
   doneIds.forEach(id=>post({action:'updateTask',id,status:'done'}).catch(e=>console.error(e)));
